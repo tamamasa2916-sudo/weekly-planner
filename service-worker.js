@@ -1,5 +1,5 @@
 /* ══ 週間スケジュール表 Service Worker ══ */
-const CACHE_NAME = 'schedule-pwa-v1';
+const CACHE_NAME = 'schedule-pwa-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -13,13 +13,15 @@ const ASSETS = [
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(ASSETS.map(url => {
-        // Googleフォントは失敗してもOK（オフライン時はシステムフォントで代替）
-        return fetch(url).then(res => {
-          if (res.ok) cache.put(url, res);
-        }).catch(() => {});
-      }));
-    }).then(() => self.skipWaiting())
+      // 各URLを個別にfetch→put。失敗（Googleフォント等）はスキップ。
+      // Promise.allに正しくPromise[]を渡す
+      var promises = ASSETS.map(function(url) {
+        return fetch(url).then(function(res) {
+          if (res && res.ok) return cache.put(url, res);
+        }).catch(function() { /* オフライン時・CORS失敗はスキップ */ });
+      });
+      return Promise.all(promises);
+    }).then(function() { return self.skipWaiting(); })
   );
 });
 

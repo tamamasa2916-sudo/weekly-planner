@@ -975,9 +975,10 @@ function buildCards() {
     SLOTS.forEach((slot, i) => {
       if (i > 0) { const sep = document.createElement('div'); sep.className = 'slot-sep'; card.appendChild(sep); }
       card.appendChild(buildSlot(day, slot));
-      renderTags(day, slot);
     });
+    // ★ カードをDOMに追加してからrenderTags（getElementById が確実に見つかるように）
     wrap.appendChild(card);
+    SLOTS.forEach(slot => renderTags(day, slot));
   });
 }
 
@@ -1095,7 +1096,7 @@ function printPreview() {
         const tagsHtml = tags.map(t =>
           `<span class="tag tag-${slot}">${escHtml(t)}</span>`
         ).join('');
-        tdHtml += `<td>${tagsHtml}</td>`;
+        tdHtml += `<td><div>${tagsHtml}</div></td>`;
       } else {
         tdHtml += `<td><span class="empty-cell">─</span></td>`;
       }
@@ -1108,48 +1109,39 @@ function printPreview() {
 <meta charset="UTF-8">
 <title>週間スケジュール表</title>
 <style>
-  /* ── A4一枚に収める基本設定 ── */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     font-family: 'Noto Sans JP', -apple-system, sans-serif;
     color: #1c1c1e;
-    width: 277mm;          /* A4横: 297mm - 余白20mm×2 */
-    height: 190mm;         /* A4縦: 210mm - 余白10mm×2 */
-    overflow: hidden;
+    /* 高さ固定なし：内容量に応じて自然にページが増える */
   }
-  /* 全体を縦方向にフレックスで配置し、表が残り高さを占有 */
-  body { display: flex; flex-direction: column; padding: 6mm 8mm; }
+  body { padding: 8mm 10mm; }
 
-  h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 3mm; flex-shrink: 0; }
+  h1 { font-size: 14pt; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 3mm; }
   .info {
-    font-size: 8pt; line-height: 1.6; margin-bottom: 3mm;
-    padding: 2mm 4mm; background: #f2f2f7; border-radius: 4px;
-    display: flex; gap: 12mm; flex-shrink: 0;
+    font-size: 9pt; line-height: 1.8; margin-bottom: 4mm;
+    padding: 2mm 5mm; background: #f2f2f7; border-radius: 4px;
+    display: flex; gap: 14mm; flex-wrap: wrap;
   }
   .info strong { font-weight: 700; }
 
-  /* 表ラッパー：残り高さをすべて使う */
-  .table-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-
   table {
     width: 100%; border-collapse: collapse;
-    table-layout: fixed;        /* 列幅を均等固定 */
-    flex: 1;
+    table-layout: fixed;
   }
-  col.col-day  { width: 14mm; }
-  col.col-slot { width: auto; }   /* 残り4列で均等分割 */
+  col.col-day  { width: 16mm; }
+  col.col-slot { width: auto; }
 
   th, td {
     border: 0.3mm solid #c6c6c8;
-    padding: 1.5mm 2mm;
+    padding: 2mm 2.5mm;
     vertical-align: top; text-align: left;
     word-break: break-all;
-    overflow: hidden;
   }
   thead th {
     background: #f2f2f7; font-weight: 700;
-    text-align: center; font-size: 8pt;
-    white-space: nowrap; height: 8mm;
+    text-align: center; font-size: 9pt;
+    white-space: nowrap;
   }
   thead th:first-child { background: #3a3a3c; color: white; }
   thead th.morning { color: #856404; }
@@ -1157,30 +1149,29 @@ function printPreview() {
   thead th.evening { color: #084298; }
   thead th.night   { color: #432874; }
 
-  /* データ行：均等高さ＋はみ出し防止 */
-  tbody { height: 0; }   /* flex残余高さのトリガー */
+  /* データ行：高さ固定なし・内容をすべて表示 */
   tbody tr {
-    /* 7行均等 ＋ はみ出し時は自動拡張しない */
-    height: calc((100% - 10mm) / 7);
-    max-height: calc((100% - 10mm) / 7);
-    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   td {
-    overflow: hidden;
-    /* セル内容が多くても行高さを超えない */
-    max-height: inherit;
+    /* overflow: visible → 全タグを表示 */
+    overflow: visible;
   }
   td.td-day {
     font-weight: 700; text-align: center;
     background: #f2f2f7; white-space: nowrap;
-    vertical-align: middle; font-size: 8pt;
+    vertical-align: middle; font-size: 9pt;
+  }
+  /* タグをセル内でflex横並び・折り返し */
+  td > div {
+    display: flex; flex-wrap: wrap; gap: 1mm;
+    align-content: flex-start;
   }
   .tag {
-    display: block; font-size: 6.5pt; font-weight: 500;
-    padding: 0.6mm 1.8mm; border-radius: 3px;
-    margin-bottom: 0.6mm; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis;
-    max-width: 100%;
+    display: inline-block; font-size: 8pt; font-weight: 500;
+    padding: 0.8mm 2.5mm; border-radius: 3px;
+    white-space: nowrap;
   }
   .empty-cell { color: #aaa; font-size: 8pt; }
   .tag-morning { background: #fff3cd; color: #856404; }
@@ -1188,19 +1179,17 @@ function printPreview() {
   .tag-evening { background: #cfe2ff; color: #084298; }
   .tag-night   { background: #e2d9f3; color: #432874; }
 
-  /* A4横向き・余白10mm・1ページ強制 */
   @page { size: A4 landscape; margin: 10mm; }
   @media print {
-    html, body { width: 277mm; height: 190mm; overflow: hidden; }
-    body { padding: 4mm 6mm; }
-    /* ページ分割を完全に防ぐ */
-    table, tbody, tr, td, th { page-break-inside: avoid; break-inside: avoid; }
+    /* 行の途中でページ分割しない */
+    tbody tr { break-inside: avoid; page-break-inside: avoid; }
+    thead     { display: table-header-group; } /* 複数ページ時にも見出し行を繰り返す */
   }
 </style>
 </head><body>
 <h1>週間スケジュール表</h1>
 ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
-<div class="table-wrap"><table>
+<table>
   <colgroup>
     <col class="col-day">
     <col class="col-slot"><col class="col-slot"><col class="col-slot"><col class="col-slot">
@@ -1215,21 +1204,9 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
     </tr>
   </thead>
   <tbody>${rowsHtml}</tbody>
-</table></div>
+</table>
 <script>
 window.onload = function() {
-  // 各セルの内容がはみ出す場合にフォントを自動縮小
-  var cells = document.querySelectorAll('tbody td:not(.td-day)');
-  cells.forEach(function(td) {
-    var tags = td.querySelectorAll('.tag');
-    if (!tags.length) return;
-    var maxH = td.clientHeight;
-    var totalH = Array.from(tags).reduce(function(s, t){ return s + t.offsetHeight + 1; }, 0);
-    if (totalH > maxH) {
-      var ratio = Math.max(0.7, maxH / totalH);
-      tags.forEach(function(t){ t.style.fontSize = (6.5 * ratio).toFixed(1) + 'pt'; });
-    }
-  });
   setTimeout(function(){ window.print(); }, 200);
 };
 <\/script>
