@@ -1,7 +1,7 @@
 {
   "name": "週間スケジュール表",
   "short_name": "週間スケジュール",
-  "description": "介護ケア週間スケジュール管理アプリ",
+  "description": "介護・福祉向け週間ケアスケジュール管理アプリ",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
@@ -21,5 +21,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["productivity", "health"]
 }
