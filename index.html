@@ -1114,42 +1114,43 @@ function printPreview() {
 <title>週間スケジュール表</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html {
+
+  html, body {
     font-family: 'Noto Sans JP', -apple-system, sans-serif;
     color: #1c1c1e;
+    width: 100%;
   }
 
-  /* ── スクリーン表示：A4横の印刷幅に合わせて固定 ── */
-  body {
-    width: 277mm;
-    margin: 0 auto;
-    padding: 5mm 7mm;
-  }
+  body { padding: 6mm 8mm; }
 
-  h1 { font-size: 14pt; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 3mm; }
+  h1 { font-size: 12pt; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 3mm; }
+
   .info {
-    font-size: 9pt; line-height: 1.8; margin-bottom: 4mm;
-    padding: 2mm 5mm; background: #f2f2f7; border-radius: 4px;
-    display: flex; gap: 14mm; flex-wrap: wrap;
+    font-size: 8pt; line-height: 1.8; margin-bottom: 3mm;
+    padding: 1.5mm 4mm; background: #f2f2f7; border-radius: 3px;
+    display: flex; gap: 10mm; flex-wrap: wrap;
   }
   .info strong { font-weight: 700; }
 
   table {
-    width: 100%; border-collapse: collapse;
+    width: 100%;
+    border-collapse: collapse;
     table-layout: fixed;
   }
-  col.col-day  { width: 16mm; }
-  col.col-slot { width: auto; }
 
   th, td {
     border: 0.3mm solid #c6c6c8;
-    padding: 2mm 2.5mm;
-    vertical-align: top; text-align: left;
+    padding: 1.2mm 2mm;
+    vertical-align: top;
+    text-align: left;
     word-break: break-all;
+    font-size: 7.5pt;
   }
   thead th {
-    background: #f2f2f7; font-weight: 700;
-    text-align: center; font-size: 9pt;
+    background: #f2f2f7;
+    font-weight: 700;
+    text-align: center;
+    font-size: 8pt;
     white-space: nowrap;
   }
   thead th:first-child { background: #3a3a3c; color: white; }
@@ -1158,33 +1159,38 @@ function printPreview() {
   thead th.evening { color: #084298; }
   thead th.night   { color: #432874; }
 
-  /* データ行 */
-  tbody tr { break-inside: avoid; page-break-inside: avoid; }
-  td { overflow: visible; }
+  col.col-day  { width: 13mm; }
+
   td.td-day {
     font-weight: 700; text-align: center;
     background: #f2f2f7; white-space: nowrap;
-    vertical-align: middle; font-size: 9pt;
+    vertical-align: middle; font-size: 8pt;
   }
-  /* タグ：flex横並び・折り返し */
-  td > div { display: flex; flex-wrap: wrap; gap: 1mm; align-content: flex-start; }
+
+  td > div { display: flex; flex-wrap: wrap; gap: 0.8mm; align-content: flex-start; }
+
   .tag {
-    display: inline-block; font-size: 8pt; font-weight: 500;
-    padding: 0.8mm 2.5mm; border-radius: 3px; white-space: nowrap;
+    display: inline-block; font-size: 7pt; font-weight: 500;
+    padding: 0.5mm 2mm; border-radius: 2px; white-space: nowrap;
   }
-  .empty-cell { color: #aaa; font-size: 8pt; }
+  .empty-cell { color: #aaa; font-size: 7pt; }
   .tag-morning { background: #fff3cd; color: #856404; }
   .tag-noon    { background: #d1e7dd; color: #0f5132; }
   .tag-evening { background: #cfe2ff; color: #084298; }
   .tag-night   { background: #e2d9f3; color: #432874; }
 
-  @page { size: A4 landscape; margin: 10mm; }
+  @page {
+    size: A4 landscape;
+    margin: 8mm 10mm;
+  }
 
   @media print {
-    /* 背景色・背景画像を強制出力 */
+    html, body { width: 100%; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    tbody tr { break-inside: avoid; page-break-inside: avoid; }
+    /* テーブル全体を1ページに収める */
+    table { page-break-inside: avoid; break-inside: avoid; }
     thead { display: table-header-group; }
+    tbody tr { page-break-inside: avoid; break-inside: avoid; }
   }
 </style>
 </head><body>
@@ -1193,7 +1199,7 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
 <table>
   <colgroup>
     <col class="col-day">
-    <col class="col-slot"><col class="col-slot"><col class="col-slot"><col class="col-slot">
+    <col><col><col><col>
   </colgroup>
   <thead>
     <tr>
@@ -1207,82 +1213,14 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
   <tbody>${rowsHtml}</tbody>
 </table>
 <script>
-// フォント読み込み完了を待ってからスケール計算＋印刷
+// フォント読み込み完了を待ってから印刷ダイアログを開く
 document.fonts.ready.then(function() {
-  applyScaleAndPrint();
-});
-
-function applyScaleAndPrint() {
-  var PX_PER_MM = 96 / 25.4;
-  // A4横 印刷可能領域：margin 10mm×2 を引いた 277mm × 190mm
-  var printW = 277 * PX_PER_MM;
-  var printH = 190 * PX_PER_MM;
-
-  var body = document.body;
-  var contentW = body.scrollWidth;
-  var contentH = body.scrollHeight;
-
-  var scaleByW = printW / contentW;
-  var scaleByH = printH / contentH;
-  var rawScale = Math.min(scaleByW, scaleByH);
-
-  var MIN_SCALE = 0.5; // これ未満は複数ページに自然展開
-
-  if (rawScale < MIN_SCALE) {
-    // 縮小しきれない → break-inside を解除して複数ページに展開
-    var rows = document.querySelectorAll('tbody tr');
-    for (var i = 0; i < rows.length; i++) {
-      rows[i].style.breakInside     = 'auto';
-      rows[i].style.pageBreakInside = 'auto';
-    }
-  } else if (rawScale < 1) {
-    // ── zoom による縮小（Chrome / Safari / Edge）──
-    // zoom はレイアウトを再計算するため印刷時にも正しくページ高が縮小される。
-    // Firefox は zoom 非対応のため別途 @media print で transform を注入する。
-    var isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
-
-    if (!isFirefox) {
-      // zoom を @media print へ注入
-      // → スクリーン表示はそのまま、印刷エンジンだけに適用
-      var zoomStyle = document.createElement('style');
-      zoomStyle.textContent = [
-        '@media print {',
-        '  html { zoom: ' + rawScale.toFixed(4) + '; }',
-        '}'
-      ].join('\n');
-      document.head.appendChild(zoomStyle);
-    } else {
-      // Firefox: 全コンテンツを wrapper div に移してから transform で縮小。
-      // wrapper の height を「縮小後の高さ」にすることで
-      // 印刷エンジンが正しい1ページ分の高さを認識できる。
-      var scaledH = Math.round(contentH * rawScale);
-      var wrapper = document.createElement('div');
-      wrapper.style.cssText = [
-        'width:' + (277 / rawScale).toFixed(2) + 'mm;',
-        'transform:scale(' + rawScale.toFixed(4) + ');',
-        'transform-origin:top left;',
-        'height:' + scaledH + 'px;'  // 縮小後の高さ → 印刷エンジンが1ページと判定
-      ].join('');
-
-      // body の子要素をすべて wrapper に移す
-      while (body.firstChild) { wrapper.appendChild(body.firstChild); }
-      body.appendChild(wrapper);
-
-      // body・html の余白のみリセット（width等は wrapper が管理するため不要）
-      body.style.margin  = '0';
-      body.style.padding = '0';
-      document.documentElement.style.margin  = '0';
-      document.documentElement.style.padding = '0';
-    }
-  }
-
-  // リフロー完了を2フレーム待ってから印刷ダイアログを開く
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
       window.print();
     });
   });
-}
+});
 <\/script>
 </body></html>`);
   win.document.close();

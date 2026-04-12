@@ -1,6 +1,6 @@
 {
   "name": "週間スケジュール表",
-  "short_name": "スケジュール",
+  "short_name": "週間スケジュール",
   "description": "介護ケア週間スケジュール管理アプリ",
   "start_url": "./index.html",
   "display": "standalone",
