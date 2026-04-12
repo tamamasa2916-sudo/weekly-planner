@@ -1108,6 +1108,29 @@ function printPreview() {
     rowsHtml += `<tr>${tdHtml}</tr>`;
   });
 
+  // ── スロットごとのタグ総数を集計して列幅を比例配分 ──
+  const slotCounts = SLOTS.map(slot =>
+    DAYS.reduce((sum, day) => sum + getTags(day, slot).length, 0)
+  );
+  const totalTags = slotCounts.reduce((a, b) => a + b, 0) || SLOTS.length;
+  const DAY_COL_PCT = 11;   // 曜日列（固定）
+  const MIN_SLOT_PCT = 12;  // 各スロット列の最小幅
+  const remaining = 100 - DAY_COL_PCT;
+
+  // 比例配分 → 最小幅を下回らないようクランプ
+  let slotWidths = slotCounts.map(c =>
+    Math.max(MIN_SLOT_PCT, Math.round((c / totalTags) * remaining))
+  );
+  // 合計を remaining に合わせる（最大幅の列で調整）
+  const widthSum = slotWidths.reduce((a, b) => a + b, 0);
+  const maxIdx = slotWidths.indexOf(Math.max(...slotWidths));
+  slotWidths[maxIdx] += remaining - widthSum;
+
+  const colGroupHtml = `<colgroup>
+    <col style="width:${DAY_COL_PCT}%">
+    ${slotWidths.map(w => `<col style="width:${w}%">`).join('')}
+  </colgroup>`;
+
   win.document.write(`<!DOCTYPE html>
 <html lang="ja"><head>
 <meta charset="UTF-8">
@@ -1121,12 +1144,10 @@ function printPreview() {
     width: 100%;
   }
 
-  body { padding: 6mm 8mm; }
-
-  h1 { font-size: 12pt; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 3mm; }
+  h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 2.5mm; }
 
   .info {
-    font-size: 8pt; line-height: 1.8; margin-bottom: 3mm;
+    font-size: 8.5pt; line-height: 1.8; margin-bottom: 3mm;
     padding: 1.5mm 4mm; background: #f2f2f7; border-radius: 3px;
     display: flex; gap: 10mm; flex-wrap: wrap;
   }
@@ -1139,19 +1160,21 @@ function printPreview() {
   }
 
   th, td {
-    border: 0.3mm solid #c6c6c8;
-    padding: 1.2mm 2mm;
+    border: 0.35mm solid #b0b0b4;
+    padding: 1.8mm 2.5mm;
     vertical-align: top;
     text-align: left;
     word-break: break-all;
-    font-size: 7.5pt;
+    font-size: 8.5pt;
+    line-height: 1.5;
   }
   thead th {
     background: #f2f2f7;
     font-weight: 700;
     text-align: center;
-    font-size: 8pt;
+    font-size: 9pt;
     white-space: nowrap;
+    padding: 2mm 2.5mm;
   }
   thead th:first-child { background: #3a3a3c; color: white; }
   thead th.morning { color: #856404; }
@@ -1159,21 +1182,19 @@ function printPreview() {
   thead th.evening { color: #084298; }
   thead th.night   { color: #432874; }
 
-  col.col-day  { width: 13mm; }
-
   td.td-day {
     font-weight: 700; text-align: center;
     background: #f2f2f7; white-space: nowrap;
-    vertical-align: middle; font-size: 8pt;
+    vertical-align: middle; font-size: 9pt;
   }
 
-  td > div { display: flex; flex-wrap: wrap; gap: 0.8mm; align-content: flex-start; }
+  td > div { display: flex; flex-wrap: wrap; gap: 1mm; align-content: flex-start; }
 
   .tag {
-    display: inline-block; font-size: 7pt; font-weight: 500;
-    padding: 0.5mm 2mm; border-radius: 2px; white-space: nowrap;
+    display: inline-block; font-size: 8pt; font-weight: 500;
+    padding: 0.6mm 2.2mm; border-radius: 2px; white-space: nowrap;
   }
-  .empty-cell { color: #aaa; font-size: 7pt; }
+  .empty-cell { color: #aaa; font-size: 8pt; }
   .tag-morning { background: #fff3cd; color: #856404; }
   .tag-noon    { background: #d1e7dd; color: #0f5132; }
   .tag-evening { background: #cfe2ff; color: #084298; }
@@ -1181,13 +1202,12 @@ function printPreview() {
 
   @page {
     size: A4 landscape;
-    margin: 12mm 10mm;
+    margin: 10mm 10mm;
   }
 
   @media print {
-    html, body { width: 100%; padding: 0; }
+    html, body { width: 100%; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* テーブルはページをまたいで印刷できるようにする（行単位では分断しない） */
     table { page-break-inside: auto; break-inside: auto; }
     thead { display: table-header-group; }
     tbody tr { page-break-inside: avoid; break-inside: avoid; }
@@ -1197,10 +1217,7 @@ function printPreview() {
 <h1>週間スケジュール表</h1>
 ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
 <table>
-  <colgroup>
-    <col class="col-day">
-    <col><col><col><col>
-  </colgroup>
+  ${colGroupHtml}
   <thead>
     <tr>
       <th>曜日</th>
