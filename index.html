@@ -1196,6 +1196,7 @@ function printPreview() {
     font-weight: 700; text-align: center;
     background: #f2f2f7; white-space: nowrap;
     vertical-align: middle; font-size: 9pt;
+    height: inherit;
   }
 
   td > div { display: flex; flex-wrap: wrap; gap: 1mm; align-content: flex-start; }
@@ -1241,14 +1242,27 @@ function printPreview() {
   </div>
 </div>
 <script>
-// フォント読み込み後に行の高さを均等配分して用紙全体を埋める
+// A4横（297×210mm）、余白10mm → コンテンツ高さ = 190mm
+// 画面DPI 96px/inch → 1mm = 96/25.4 px
 document.fonts.ready.then(function() {
-  var tWrap = document.querySelector('.table-wrap');
-  var thead = document.querySelector('thead');
-  var rows  = Array.from(document.querySelectorAll('tbody tr'));
-  var available = tWrap.clientHeight - thead.offsetHeight - rows.length;
-  var rowH = Math.max(18, Math.floor(available / rows.length));
+  var PX_PER_MM = 96 / 25.4;
+  var pageH_px  = 190 * PX_PER_MM; // 約718px
+
+  function elH(sel) {
+    var el = document.querySelector(sel);
+    if (!el) return 0;
+    var r  = el.getBoundingClientRect();
+    var mb = parseFloat(getComputedStyle(el).marginBottom) || 0;
+    return r.height + mb;
+  }
+
+  var rows      = Array.from(document.querySelectorAll('tbody tr'));
+  var overhead  = elH('h1') + elH('.info') + elH('thead');
+  var available = pageH_px - overhead - rows.length; // ボーダー1pxずつ引く
+  var rowH      = Math.max(20, Math.floor(available / rows.length));
+
   rows.forEach(function(r) { r.style.height = rowH + 'px'; });
+
   requestAnimationFrame(function() {
     requestAnimationFrame(function() { window.print(); });
   });
