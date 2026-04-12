@@ -37,7 +37,7 @@
     --safe-b: env(safe-area-inset-bottom,0px);
     --safe-l: env(safe-area-inset-left,0px);
     --safe-r: env(safe-area-inset-right,0px);
-    --bar-h: 64px;
+    --bar-h: 110px;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -860,9 +860,13 @@ function addTag(day, slot, value) {
   setTags(day, slot, tags);
   if (!allOpts(slot).includes(v)) {
     customOptions[slot].push(v);
-    // プルダウンに追加
-    const sel = document.getElementById(`sel-${day}-${slot}`);
-    if (sel) { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); }
+    // 全曜日のプルダウンに追加
+    DAYS.forEach(function(d) {
+      const s = document.getElementById('sel-' + d + '-' + slot);
+      if (s && !Array.from(s.options).some(function(o) { return o.value === v; })) {
+        const opt = document.createElement('option'); opt.value = v; opt.textContent = v; s.appendChild(opt);
+      }
+    });
   }
   renderTags(day, slot);
   persistData();
@@ -1114,9 +1118,9 @@ function printPreview() {
     font-family: 'Noto Sans JP', -apple-system, sans-serif;
     color: #1c1c1e;
   }
+
+  /* ── スクリーン表示：A4横の印刷幅に合わせて固定 ── */
   body {
-    /* ★ A4横の印刷可能幅（297mm - margin 10mm×2）に固定
-       → table が width:100% でもウィンドウ幅に引っ張られない */
     width: 277mm;
     margin: 0 auto;
     padding: 5mm 7mm;
@@ -1154,7 +1158,7 @@ function printPreview() {
   thead th.evening { color: #084298; }
   thead th.night   { color: #432874; }
 
-  /* データ行：高さ固定なし・全内容表示 */
+  /* データ行 */
   tbody tr { break-inside: avoid; page-break-inside: avoid; }
   td { overflow: visible; }
   td.td-day {
@@ -1175,9 +1179,15 @@ function printPreview() {
   .tag-night   { background: #e2d9f3; color: #432874; }
 
   @page { size: A4 landscape; margin: 10mm; }
+
   @media print {
-    /* 印刷時もbody幅をA4印刷領域に固定 */
-    body { width: 277mm; margin: 0; }
+    body {
+      width: 277mm !important;
+      margin: 0 !important;
+      padding: 5mm 7mm !important;
+    }
+    /* 背景色・背景画像を強制出力 */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     tbody tr { break-inside: avoid; page-break-inside: avoid; }
     thead { display: table-header-group; }
   }
@@ -1202,27 +1212,49 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
   <tbody>${rowsHtml}</tbody>
 </table>
 <script>
-window.onload = function() {
-  var body     = document.body;
-  var PX_PER_MM = 96 / 25.4;
-  // A4横 印刷可能領域：margin 10mm×2 を引いた 277mm × 190mm
-  var printH   = 190 * PX_PER_MM;
+// フォント読み込み完了を待ってからスケール計算＋印刷
+document.fonts.ready.then(function() {
+  applyScaleAndPrint();
+});
 
-  // body が 277mm 幅でレンダリングされた後の実際の高さを取得
+function applyScaleAndPrint() {
+  var body = document.body;
+
+  // A4横 印刷可能領域：margin 10mm×2 を引いた 277mm × 190mm
+  // 96dpi 換算: 1mm = 96/25.4 px
+  var PX_PER_MM = 96 / 25.4;
+  var printW = 277 * PX_PER_MM;
+  var printH = 190 * PX_PER_MM;
+
+  // body が 277mm 幅でレンダリングされた状態の正確なサイズを取得
+  var contentW = body.scrollWidth;
   var contentH = body.scrollHeight;
 
-  if (contentH > printH) {
-    var rawScale = printH / contentH;          // 1ページに収めるために必要な倍率
-    var scale    = Math.max(0.45, rawScale);   // 最小 45% まで縮小
+  // 幅・高さ両方を考慮してスケールを決定
+  var scaleByW = printW / contentW;
+  var scaleByH = printH / contentH;
+  var rawScale = Math.min(scaleByW, scaleByH);
 
-    // ★ body 幅を scale の逆数に拡大してから zoom をかける
-    //    → zoom 後に常に 277mm になり、横方向のクリップが起きない
-    body.style.width = (277 / scale).toFixed(2) + 'mm';
-    body.style.zoom  = scale.toFixed(4);
+  var MIN_SCALE = 0.5; // これ以上縮小できない場合は複数ページに展開
 
-    // 45% でも 1 ページに収まらない場合（項目が非常に多い）
-    // → break-inside を解除して 2 ページ以上に自然展開
-    if (rawScale < 0.45) {
+  if (rawScale < 1) {
+    if (rawScale >= MIN_SCALE) {
+      // 1ページに収まる → @media print ブロックを動的に注入してスケール適用
+      // スクリーン表示には影響せず、印刷エンジンに確実に渡る
+      var style = document.createElement('style');
+      style.textContent = [
+        '@media print {',
+        '  body {',
+        '    transform: scale(' + rawScale.toFixed(4) + ') !important;',
+        '    transform-origin: top left !important;',
+        '    width: ' + (277 / rawScale).toFixed(2) + 'mm !important;',
+        '    margin: 0 !important;',
+        '  }',
+        '}'
+      ].join('\n');
+      document.head.appendChild(style);
+    } else {
+      // MIN_SCALE 未満 → 縮小しきれないので複数ページに自然展開
       var rows = document.querySelectorAll('tbody tr');
       for (var i = 0; i < rows.length; i++) {
         rows[i].style.breakInside     = 'auto';
@@ -1231,9 +1263,13 @@ window.onload = function() {
     }
   }
 
-  // zoom 適用後のリフローを待ってから印刷ダイアログを開く
-  setTimeout(function(){ window.print(); }, 450);
-};
+  // リフロー完了を1フレーム待ってから印刷ダイアログを開く
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      window.print();
+    });
+  });
+}
 <\/script>
 </body></html>`);
   win.document.close();
@@ -1387,16 +1423,32 @@ function editTag(day, slot, oldValue) {
   const saveBtn  = document.getElementById('edit-save-btn');
   const cancelBtn= document.getElementById('edit-cancel-btn');
 
-  input.value = oldValue;
   overlay.classList.add('open');
-
-  // フォーカスを少し遅らせてiOSキーボードを確実に開く
-  setTimeout(function() { input.focus(); input.select(); }, 100);
 
   function close() { overlay.classList.remove('open'); }
 
+  // イベントをクリーンに付け直す（edit-input も cloneNode でリセット）
+  var newSave   = saveBtn.cloneNode(true);
+  var newCancel = cancelBtn.cloneNode(true);
+  var newInput  = input.cloneNode(true);
+  saveBtn.parentNode.replaceChild(newSave, saveBtn);
+  cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+  input.parentNode.replaceChild(newInput, input);
+
+  newInput.value = oldValue;
+  setTimeout(function() { newInput.focus(); newInput.select(); }, 100);
+
+  newSave.addEventListener('click', doSave);
+  newCancel.addEventListener('click', close);
+  newInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); doSave(); }
+  });
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) close();
+  }, { once: true });
+
   function doSave() {
-    var newValue = input.value.trim();
+    var newValue = newInput.value.trim();
     if (!newValue) { showToast('内容を入力してください'); return; }
     if (newValue === oldValue) { close(); return; }
 
@@ -1414,21 +1466,6 @@ function editTag(day, slot, oldValue) {
     close();
     showToast('編集しました');
   }
-
-  // イベントをクリーンに付け直す
-  var newSave   = saveBtn.cloneNode(true);
-  var newCancel = cancelBtn.cloneNode(true);
-  saveBtn.parentNode.replaceChild(newSave, saveBtn);
-  cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-
-  newSave.addEventListener('click', doSave);
-  newCancel.addEventListener('click', close);
-  document.getElementById('edit-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); doSave(); }
-  });
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) close();
-  }, { once: true });
 }
 
 /* ══ 確認ダイアログ（iOS confirm代替）══ */
