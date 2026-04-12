@@ -1141,30 +1141,20 @@ function printPreview() {
   html, body {
     font-family: 'Noto Sans JP', -apple-system, sans-serif;
     color: #1c1c1e;
-    width: 100%; height: 100%;
+    width: 100%;
   }
 
-  /* 用紙全体をFlexで縦方向に使い切る */
-  .page-wrap {
-    width: 100%; height: 100%;
-    display: flex; flex-direction: column;
-  }
-
-  h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.06em;
-       margin-bottom: 2.5mm; flex-shrink: 0; }
+  h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 2.5mm; }
 
   .info {
     font-size: 8.5pt; line-height: 1.8; margin-bottom: 3mm;
     padding: 1.5mm 4mm; background: #f2f2f7; border-radius: 3px;
-    display: flex; gap: 10mm; flex-wrap: wrap; flex-shrink: 0;
+    display: flex; gap: 10mm; flex-wrap: wrap;
   }
   .info strong { font-weight: 700; }
 
-  /* テーブルが残り全高を占有 */
-  .table-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-
   table {
-    width: 100%; height: 100%;
+    width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
   }
@@ -1177,6 +1167,9 @@ function printPreview() {
     word-break: break-all;
     font-size: 8.5pt;
     line-height: 1.5;
+    /* タグが多くても行高を固定するためにはみ出しを隠す */
+    overflow: hidden;
+    max-height: inherit;
   }
   thead th {
     background: #f2f2f7;
@@ -1192,11 +1185,11 @@ function printPreview() {
   thead th.evening { color: #084298; }
   thead th.night   { color: #432874; }
 
+  /* 曜日セル：行高を引き継いで縦中央揃え */
   td.td-day {
     font-weight: 700; text-align: center;
     background: #f2f2f7; white-space: nowrap;
     vertical-align: middle; font-size: 9pt;
-    height: inherit;
   }
 
   td > div { display: flex; flex-wrap: wrap; gap: 1mm; align-content: flex-start; }
@@ -1214,7 +1207,6 @@ function printPreview() {
   @page { size: A4 landscape; margin: 10mm; }
 
   @media print {
-    html, body { width: 100%; height: 100%; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     table { page-break-inside: auto; break-inside: auto; }
     thead { display: table-header-group; }
@@ -1222,46 +1214,46 @@ function printPreview() {
   }
 </style>
 </head><body>
-<div class="page-wrap">
-  <h1>週間スケジュール表</h1>
-  ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
-  <div class="table-wrap">
-    <table>
-      ${colGroupHtml}
-      <thead>
-        <tr>
-          <th>曜日</th>
-          <th class="morning">${ICONS.morning}</th>
-          <th class="noon">${ICONS.noon}</th>
-          <th class="evening">${ICONS.evening}</th>
-          <th class="night">${ICONS.night}</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>
-  </div>
-</div>
+<h1>週間スケジュール表</h1>
+${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
+<table>
+  ${colGroupHtml}
+  <thead>
+    <tr>
+      <th>曜日</th>
+      <th class="morning">${ICONS.morning}</th>
+      <th class="noon">${ICONS.noon}</th>
+      <th class="evening">${ICONS.evening}</th>
+      <th class="night">${ICONS.night}</th>
+    </tr>
+  </thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
 <script>
-// A4横（297×210mm）、余白10mm → コンテンツ高さ = 190mm
-// 画面DPI 96px/inch → 1mm = 96/25.4 px
+// A4横 余白10mm → コンテンツ高 190mm を基準に全7行を均等固定
 document.fonts.ready.then(function() {
-  var PX_PER_MM = 96 / 25.4;
-  var pageH_px  = 190 * PX_PER_MM; // 約718px
+  var MM   = 96 / 25.4;          // 1mm → px（96dpi基準）
+  var PAGE = 190 * MM;           // 約718px
 
-  function elH(sel) {
+  function outerH(sel) {
     var el = document.querySelector(sel);
     if (!el) return 0;
-    var r  = el.getBoundingClientRect();
-    var mb = parseFloat(getComputedStyle(el).marginBottom) || 0;
-    return r.height + mb;
+    var s = getComputedStyle(el);
+    return el.getBoundingClientRect().height
+      + (parseFloat(s.marginTop)    || 0)
+      + (parseFloat(s.marginBottom) || 0);
   }
 
-  var rows      = Array.from(document.querySelectorAll('tbody tr'));
-  var overhead  = elH('h1') + elH('.info') + elH('thead');
-  var available = pageH_px - overhead - rows.length; // ボーダー1pxずつ引く
-  var rowH      = Math.max(20, Math.floor(available / rows.length));
+  var rows  = Array.from(document.querySelectorAll('tbody tr'));
+  var used  = outerH('h1') + outerH('.info') + outerH('thead');
+  var rowH  = Math.floor((PAGE - used - rows.length) / rows.length);
+  rowH      = Math.max(22, rowH);  // 最低22px確保
 
-  rows.forEach(function(r) { r.style.height = rowH + 'px'; });
+  // tr に height と max-height を両方設定して厳密に固定
+  rows.forEach(function(r) {
+    r.style.height    = rowH + 'px';
+    r.style.maxHeight = rowH + 'px';
+  });
 
   requestAnimationFrame(function() {
     requestAnimationFrame(function() { window.print(); });
