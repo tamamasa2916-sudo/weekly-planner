@@ -1181,14 +1181,14 @@ function printPreview() {
 
   @page {
     size: A4 landscape;
-    margin: 8mm 10mm;
+    margin: 12mm 10mm;
   }
 
   @media print {
-    html, body { width: 100%; }
+    html, body { width: 100%; padding: 0; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    /* テーブル全体を1ページに収める */
-    table { page-break-inside: avoid; break-inside: avoid; }
+    /* テーブルはページをまたいで印刷できるようにする（行単位では分断しない） */
+    table { page-break-inside: auto; break-inside: auto; }
     thead { display: table-header-group; }
     tbody tr { page-break-inside: avoid; break-inside: avoid; }
   }
