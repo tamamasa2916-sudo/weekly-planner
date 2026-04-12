@@ -1181,11 +1181,6 @@ function printPreview() {
   @page { size: A4 landscape; margin: 10mm; }
 
   @media print {
-    body {
-      width: 277mm !important;
-      margin: 0 !important;
-      padding: 5mm 7mm !important;
-    }
     /* 背景色・背景画像を強制出力 */
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     tbody tr { break-inside: avoid; page-break-inside: avoid; }
@@ -1218,52 +1213,70 @@ document.fonts.ready.then(function() {
 });
 
 function applyScaleAndPrint() {
-  var body = document.body;
-
-  // A4横 印刷可能領域：margin 10mm×2 を引いた 277mm × 190mm
-  // 96dpi 換算: 1mm = 96/25.4 px
   var PX_PER_MM = 96 / 25.4;
+  // A4横 印刷可能領域：margin 10mm×2 を引いた 277mm × 190mm
   var printW = 277 * PX_PER_MM;
   var printH = 190 * PX_PER_MM;
 
-  // body が 277mm 幅でレンダリングされた状態の正確なサイズを取得
+  var body = document.body;
   var contentW = body.scrollWidth;
   var contentH = body.scrollHeight;
 
-  // 幅・高さ両方を考慮してスケールを決定
   var scaleByW = printW / contentW;
   var scaleByH = printH / contentH;
   var rawScale = Math.min(scaleByW, scaleByH);
 
-  var MIN_SCALE = 0.5; // これ以上縮小できない場合は複数ページに展開
+  var MIN_SCALE = 0.5; // これ未満は複数ページに自然展開
 
-  if (rawScale < 1) {
-    if (rawScale >= MIN_SCALE) {
-      // 1ページに収まる → @media print ブロックを動的に注入してスケール適用
-      // スクリーン表示には影響せず、印刷エンジンに確実に渡る
-      var style = document.createElement('style');
-      style.textContent = [
+  if (rawScale < MIN_SCALE) {
+    // 縮小しきれない → break-inside を解除して複数ページに展開
+    var rows = document.querySelectorAll('tbody tr');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].style.breakInside     = 'auto';
+      rows[i].style.pageBreakInside = 'auto';
+    }
+  } else if (rawScale < 1) {
+    // ── zoom による縮小（Chrome / Safari / Edge）──
+    // zoom はレイアウトを再計算するため印刷時にも正しくページ高が縮小される。
+    // Firefox は zoom 非対応のため別途 @media print で transform を注入する。
+    var isFirefox = navigator.userAgent.indexOf('Firefox') !== -1;
+
+    if (!isFirefox) {
+      // zoom を @media print へ注入
+      // → スクリーン表示はそのまま、印刷エンジンだけに適用
+      var zoomStyle = document.createElement('style');
+      zoomStyle.textContent = [
         '@media print {',
-        '  body {',
-        '    transform: scale(' + rawScale.toFixed(4) + ') !important;',
-        '    transform-origin: top left !important;',
-        '    width: ' + (277 / rawScale).toFixed(2) + 'mm !important;',
-        '    margin: 0 !important;',
-        '  }',
+        '  html { zoom: ' + rawScale.toFixed(4) + '; }',
         '}'
       ].join('\n');
-      document.head.appendChild(style);
+      document.head.appendChild(zoomStyle);
     } else {
-      // MIN_SCALE 未満 → 縮小しきれないので複数ページに自然展開
-      var rows = document.querySelectorAll('tbody tr');
-      for (var i = 0; i < rows.length; i++) {
-        rows[i].style.breakInside     = 'auto';
-        rows[i].style.pageBreakInside = 'auto';
-      }
+      // Firefox: 全コンテンツを wrapper div に移してから transform で縮小。
+      // wrapper の height を「縮小後の高さ」にすることで
+      // 印刷エンジンが正しい1ページ分の高さを認識できる。
+      var scaledH = Math.round(contentH * rawScale);
+      var wrapper = document.createElement('div');
+      wrapper.style.cssText = [
+        'width:' + (277 / rawScale).toFixed(2) + 'mm;',
+        'transform:scale(' + rawScale.toFixed(4) + ');',
+        'transform-origin:top left;',
+        'height:' + scaledH + 'px;'  // 縮小後の高さ → 印刷エンジンが1ページと判定
+      ].join('');
+
+      // body の子要素をすべて wrapper に移す
+      while (body.firstChild) { wrapper.appendChild(body.firstChild); }
+      body.appendChild(wrapper);
+
+      // body・html の余白のみリセット（width等は wrapper が管理するため不要）
+      body.style.margin  = '0';
+      body.style.padding = '0';
+      document.documentElement.style.margin  = '0';
+      document.documentElement.style.padding = '0';
     }
   }
 
-  // リフロー完了を1フレーム待ってから印刷ダイアログを開く
+  // リフロー完了を2フレーム待ってから印刷ダイアログを開く
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
       window.print();
