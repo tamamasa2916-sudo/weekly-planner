@@ -1230,10 +1230,11 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
   <tbody>${rowsHtml}</tbody>
 </table>
 <script>
-// A4横 余白10mm → コンテンツ高 190mm を基準に全7行を均等固定
+// A4横 余白10mm → コンテンツ幅277mm・高190mm を基準に自動倍率調整
 document.fonts.ready.then(function() {
-  var MM   = 96 / 25.4;          // 1mm → px（96dpi基準）
-  var PAGE = 190 * MM;           // 約718px
+  var MM     = 96 / 25.4;
+  var PAGE_W = 277 * MM;   // 約1047px
+  var PAGE_H = 190 * MM;   // 約 718px
 
   function outerH(sel) {
     var el = document.querySelector(sel);
@@ -1244,18 +1245,27 @@ document.fonts.ready.then(function() {
       + (parseFloat(s.marginBottom) || 0);
   }
 
-  var rows  = Array.from(document.querySelectorAll('tbody tr'));
-  var used  = outerH('h1') + outerH('.info') + outerH('thead');
-  var rowH  = Math.floor((PAGE - used - rows.length) / rows.length);
-  rowH      = Math.max(22, rowH);  // 最低22px確保
-
-  // tr に height と max-height を両方設定して厳密に固定
+  // Step 1: 全7行を均等高さに固定
+  var rows = Array.from(document.querySelectorAll('tbody tr'));
+  var used = outerH('h1') + outerH('.info') + outerH('thead');
+  var rowH = Math.max(22, Math.floor((PAGE_H - used - rows.length) / rows.length));
   rows.forEach(function(r) {
     r.style.height    = rowH + 'px';
     r.style.maxHeight = rowH + 'px';
   });
 
+  // Step 2: レイアウト確定後にコンテンツ実寸を測定して倍率を算出
   requestAnimationFrame(function() {
+    var cW    = document.documentElement.scrollWidth;
+    var cH    = document.documentElement.scrollHeight;
+    var scale = Math.min(PAGE_W / cW, PAGE_H / cH);
+    scale     = Math.min(Math.max(scale, 0.3), 2.0); // 30%〜200%に制限
+
+    // 1%以上ズレがあるときだけ適用（不要な再描画を避ける）
+    if (Math.abs(scale - 1) > 0.01) {
+      document.body.style.zoom = scale;
+    }
+
     requestAnimationFrame(function() { window.print(); });
   });
 });
