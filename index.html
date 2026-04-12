@@ -1141,20 +1141,30 @@ function printPreview() {
   html, body {
     font-family: 'Noto Sans JP', -apple-system, sans-serif;
     color: #1c1c1e;
-    width: 100%;
+    width: 100%; height: 100%;
   }
 
-  h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 2.5mm; }
+  /* 用紙全体をFlexで縦方向に使い切る */
+  .page-wrap {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+  }
+
+  h1 { font-size: 13pt; font-weight: 700; letter-spacing: 0.06em;
+       margin-bottom: 2.5mm; flex-shrink: 0; }
 
   .info {
     font-size: 8.5pt; line-height: 1.8; margin-bottom: 3mm;
     padding: 1.5mm 4mm; background: #f2f2f7; border-radius: 3px;
-    display: flex; gap: 10mm; flex-wrap: wrap;
+    display: flex; gap: 10mm; flex-wrap: wrap; flex-shrink: 0;
   }
   .info strong { font-weight: 700; }
 
+  /* テーブルが残り全高を占有 */
+  .table-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
   table {
-    width: 100%;
+    width: 100%; height: 100%;
     border-collapse: collapse;
     table-layout: fixed;
   }
@@ -1200,13 +1210,10 @@ function printPreview() {
   .tag-evening { background: #cfe2ff; color: #084298; }
   .tag-night   { background: #e2d9f3; color: #432874; }
 
-  @page {
-    size: A4 landscape;
-    margin: 10mm 10mm;
-  }
+  @page { size: A4 landscape; margin: 10mm; }
 
   @media print {
-    html, body { width: 100%; }
+    html, body { width: 100%; height: 100%; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     table { page-break-inside: auto; break-inside: auto; }
     thead { display: table-header-group; }
@@ -1214,28 +1221,36 @@ function printPreview() {
   }
 </style>
 </head><body>
-<h1>週間スケジュール表</h1>
-${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
-<table>
-  ${colGroupHtml}
-  <thead>
-    <tr>
-      <th>曜日</th>
-      <th class="morning">${ICONS.morning}</th>
-      <th class="noon">${ICONS.noon}</th>
-      <th class="evening">${ICONS.evening}</th>
-      <th class="night">${ICONS.night}</th>
-    </tr>
-  </thead>
-  <tbody>${rowsHtml}</tbody>
-</table>
+<div class="page-wrap">
+  <h1>週間スケジュール表</h1>
+  ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
+  <div class="table-wrap">
+    <table>
+      ${colGroupHtml}
+      <thead>
+        <tr>
+          <th>曜日</th>
+          <th class="morning">${ICONS.morning}</th>
+          <th class="noon">${ICONS.noon}</th>
+          <th class="evening">${ICONS.evening}</th>
+          <th class="night">${ICONS.night}</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  </div>
+</div>
 <script>
-// フォント読み込み完了を待ってから印刷ダイアログを開く
+// フォント読み込み後に行の高さを均等配分して用紙全体を埋める
 document.fonts.ready.then(function() {
+  var tWrap = document.querySelector('.table-wrap');
+  var thead = document.querySelector('thead');
+  var rows  = Array.from(document.querySelectorAll('tbody tr'));
+  var available = tWrap.clientHeight - thead.offsetHeight - rows.length;
+  var rowH = Math.max(18, Math.floor(available / rows.length));
+  rows.forEach(function(r) { r.style.height = rowH + 'px'; });
   requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      window.print();
-    });
+    requestAnimationFrame(function() { window.print(); });
   });
 });
 <\/script>
