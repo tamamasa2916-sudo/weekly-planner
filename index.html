@@ -1110,12 +1110,17 @@ function printPreview() {
 <title>週間スケジュール表</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
+  html {
     font-family: 'Noto Sans JP', -apple-system, sans-serif;
     color: #1c1c1e;
-    /* 高さ固定なし：内容量に応じて自然にページが増える */
   }
-  body { padding: 8mm 10mm; }
+  body {
+    /* ★ A4横の印刷可能幅（297mm - margin 10mm×2）に固定
+       → table が width:100% でもウィンドウ幅に引っ張られない */
+    width: 277mm;
+    margin: 0 auto;
+    padding: 5mm 7mm;
+  }
 
   h1 { font-size: 14pt; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 3mm; }
   .info {
@@ -1149,29 +1154,19 @@ function printPreview() {
   thead th.evening { color: #084298; }
   thead th.night   { color: #432874; }
 
-  /* データ行：高さ固定なし・内容をすべて表示 */
-  tbody tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  td {
-    /* overflow: visible → 全タグを表示 */
-    overflow: visible;
-  }
+  /* データ行：高さ固定なし・全内容表示 */
+  tbody tr { break-inside: avoid; page-break-inside: avoid; }
+  td { overflow: visible; }
   td.td-day {
     font-weight: 700; text-align: center;
     background: #f2f2f7; white-space: nowrap;
     vertical-align: middle; font-size: 9pt;
   }
-  /* タグをセル内でflex横並び・折り返し */
-  td > div {
-    display: flex; flex-wrap: wrap; gap: 1mm;
-    align-content: flex-start;
-  }
+  /* タグ：flex横並び・折り返し */
+  td > div { display: flex; flex-wrap: wrap; gap: 1mm; align-content: flex-start; }
   .tag {
     display: inline-block; font-size: 8pt; font-weight: 500;
-    padding: 0.8mm 2.5mm; border-radius: 3px;
-    white-space: nowrap;
+    padding: 0.8mm 2.5mm; border-radius: 3px; white-space: nowrap;
   }
   .empty-cell { color: #aaa; font-size: 8pt; }
   .tag-morning { background: #fff3cd; color: #856404; }
@@ -1181,9 +1176,10 @@ function printPreview() {
 
   @page { size: A4 landscape; margin: 10mm; }
   @media print {
-    /* 行の途中でページ分割しない */
+    /* 印刷時もbody幅をA4印刷領域に固定 */
+    body { width: 277mm; margin: 0; }
     tbody tr { break-inside: avoid; page-break-inside: avoid; }
-    thead     { display: table-header-group; } /* 複数ページ時にも見出し行を繰り返す */
+    thead { display: table-header-group; }
   }
 </style>
 </head><body>
@@ -1207,7 +1203,36 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
 </table>
 <script>
 window.onload = function() {
-  setTimeout(function(){ window.print(); }, 200);
+  var body     = document.body;
+  var PX_PER_MM = 96 / 25.4;
+  // A4横 印刷可能領域：margin 10mm×2 を引いた 277mm × 190mm
+  var printH   = 190 * PX_PER_MM;
+
+  // body が 277mm 幅でレンダリングされた後の実際の高さを取得
+  var contentH = body.scrollHeight;
+
+  if (contentH > printH) {
+    var rawScale = printH / contentH;          // 1ページに収めるために必要な倍率
+    var scale    = Math.max(0.45, rawScale);   // 最小 45% まで縮小
+
+    // ★ body 幅を scale の逆数に拡大してから zoom をかける
+    //    → zoom 後に常に 277mm になり、横方向のクリップが起きない
+    body.style.width = (277 / scale).toFixed(2) + 'mm';
+    body.style.zoom  = scale.toFixed(4);
+
+    // 45% でも 1 ページに収まらない場合（項目が非常に多い）
+    // → break-inside を解除して 2 ページ以上に自然展開
+    if (rawScale < 0.45) {
+      var rows = document.querySelectorAll('tbody tr');
+      for (var i = 0; i < rows.length; i++) {
+        rows[i].style.breakInside     = 'auto';
+        rows[i].style.pageBreakInside = 'auto';
+      }
+    }
+  }
+
+  // zoom 適用後のリフローを待ってから印刷ダイアログを開く
+  setTimeout(function(){ window.print(); }, 450);
 };
 <\/script>
 </body></html>`);
