@@ -378,15 +378,126 @@
   .user-field-input:focus { border-color: var(--blue); }
   .user-field-input::placeholder { color: var(--muted); font-size: 0.82rem; }
 
-  /* 印刷 */
+  /* ══ 印刷専用テーブル（画面では非表示）══ */
+  #print-view { display: none; }
+
+  /* ══ 印刷：A4横・1枚に収める ══ */
   @media print {
-    body { background: white; padding: 0; }
-    .bottom-bar, .undo-bar, #save-status, .input-area { display: none !important; }
+    @page { size: A4 landscape; margin: 8mm; }
+
+    /* 印刷不要要素を全て非表示 */
+    #page-main, .bottom-bar, .undo-bar, #save-status,
     #page-history, #page-options,
-    .modal-overlay, .confirm-overlay, .edit-overlay, .pdf-modal-overlay { display: none !important; }
-    .day-card { box-shadow: none; border: 1px solid #ccc; margin-bottom: 10px; break-inside: avoid; }
-    .page { display: none !important; }
-    #page-main { display: block !important; }
+    .modal-overlay, .confirm-overlay, .edit-overlay { display: none !important; }
+
+    /* ページ全体リセット */
+    html, body {
+      width: 100%; height: 100%;
+      margin: 0; padding: 0;
+      background: white;
+      font-family: 'Noto Sans JP', -apple-system, sans-serif;
+      color: #1c1c1e;
+    }
+
+    /* 印刷テーブルを全面表示 */
+    #print-view {
+      display: flex !important;
+      flex-direction: column;
+      /* A4横: 297mm - 余白8mm×2 = 281mm / 高さ: 210mm - 8mm×2 = 194mm */
+      width: 281mm;
+      height: 194mm;
+      overflow: hidden;
+    }
+
+    /* 利用者情報ヘッダー */
+    #print-info {
+      flex-shrink: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 6mm;
+      padding-bottom: 2mm;
+      border-bottom: 0.5mm solid #3a3a3c;
+      margin-bottom: 2mm;
+      font-size: 8pt;
+    }
+    #print-info .pi-title {
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      margin-right: 2mm;
+    }
+    #print-info .pi-field { color: #3a3a3c; }
+    #print-info .pi-label { font-weight: 700; margin-right: 1mm; }
+
+    /* メインテーブル */
+    #print-table {
+      flex: 1;
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      /* 残り高さを均等に割り付け */
+      height: 0; /* flex: 1 に任せるためのリセット */
+    }
+
+    #print-table th, #print-table td {
+      border: 0.3mm solid #aaa;
+      vertical-align: top;
+      overflow: hidden;
+      padding: 1mm 1.5mm;
+      font-size: 7.5pt;
+      line-height: 1.4;
+    }
+
+    /* 列幅：曜日12% / 朝昼夕夜 各22% */
+    #print-table col.col-day  { width: 12%; }
+    #print-table col.col-slot { width: 22%; }
+
+    /* ヘッダー行 */
+    #print-table thead th {
+      font-weight: 700;
+      font-size: 8pt;
+      text-align: center;
+      padding: 1.5mm;
+      white-space: nowrap;
+      background: #f2f2f7;
+    }
+    #print-table thead th:first-child { background: #3a3a3c; color: #fff; }
+    #print-table thead th.th-morning  { color: #856404; }
+    #print-table thead th.th-noon     { color: #0f5132; }
+    #print-table thead th.th-evening  { color: #084298; }
+    #print-table thead th.th-night    { color: #432874; }
+
+    /* 曜日セル */
+    #print-table td.td-day {
+      font-weight: 700;
+      font-size: 8.5pt;
+      text-align: center;
+      vertical-align: middle;
+      background: #f2f2f7;
+      white-space: nowrap;
+    }
+
+    /* タグチップ */
+    #print-table .pt-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8mm;
+      align-content: flex-start;
+    }
+    #print-table .pt-tag {
+      display: inline-block;
+      font-size: 7pt;
+      font-weight: 500;
+      padding: 0.4mm 2mm;
+      border-radius: 2px;
+      white-space: nowrap;
+      line-height: 1.5;
+    }
+    #print-table .pt-tag.morning { background: #fff3cd; color: #856404; }
+    #print-table .pt-tag.noon    { background: #d1e7dd; color: #0f5132; }
+    #print-table .pt-tag.evening { background: #cfe2ff; color: #084298; }
+    #print-table .pt-tag.night   { background: #e2d9f3; color: #432874; }
+    #print-table .pt-empty       { color: #aaa; font-size: 7pt; }
   }
 </style>
 </head>
@@ -458,6 +569,28 @@
   </div>
 </div>
 <input type="file" id="file-input" accept=".json" onchange="importData(event)">
+
+<!-- ══ 印刷専用テーブル（@media print でのみ表示）══ -->
+<div id="print-view" aria-hidden="true">
+  <div id="print-info"></div>
+  <table id="print-table">
+    <colgroup>
+      <col class="col-day">
+      <col class="col-slot"><col class="col-slot">
+      <col class="col-slot"><col class="col-slot">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>曜日</th>
+        <th class="th-morning">🌅 朝</th>
+        <th class="th-noon">☀️ 昼</th>
+        <th class="th-evening">🌇 夕</th>
+        <th class="th-night">🌙 夜</th>
+      </tr>
+    </thead>
+    <tbody id="print-tbody"></tbody>
+  </table>
+</div>
 
 <!-- ══ プレビューモーダル ══ -->
 <div class="modal-overlay" id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" onclick="closePreviewOutside(event)">
@@ -545,7 +678,7 @@ function loadUserInfo() {
     if (u.name)   document.getElementById('user-name').value   = u.name;
     if (u.staff)  document.getElementById('user-staff').value  = u.staff;
     if (u.period) document.getElementById('user-period').value = u.period;
-  } catch {}
+  } catch (e) { console.warn('loadUserInfo failed:', e); }
 }
 function saveUserInfo() {
   try { localStorage.setItem(USER_KEY, JSON.stringify(getUserInfo())); } catch (e) {
@@ -580,8 +713,8 @@ function undo() {
 /* ══ ストレージ ══ */
 function loadFromStorage() {
   try { const s = localStorage.getItem(STORAGE_KEY); data = s ? JSON.parse(s) : { '月曜日-morning': ['排泄ケア','モーニングケア','食事準備'] }; }
-  catch { data = { '月曜日-morning': ['排泄ケア','モーニングケア','食事準備'] }; }
-  try { const c = localStorage.getItem(CUSTOM_KEY); if (c) customOptions = JSON.parse(c); } catch {}
+  catch (e) { console.warn('loadFromStorage failed:', e); data = { '月曜日-morning': ['排泄ケア','モーニングケア','食事準備'] }; }
+  try { const c = localStorage.getItem(CUSTOM_KEY); if (c) customOptions = JSON.parse(c); } catch (e) { console.warn('loadCustomOptions failed:', e); }
 }
 
 function persistData() {
@@ -931,6 +1064,8 @@ function renderTags(day, slot) {
     tag.appendChild(lbl); tag.appendChild(rm);
     list.appendChild(tag);
   });
+  // 印刷テーブルも同期更新
+  updatePrintCell(day, slot);
 }
 
 /* ══ カード構築 ══ */
@@ -999,9 +1134,82 @@ function buildCards() {
       if (i > 0) { const sep = document.createElement('div'); sep.className = 'slot-sep'; card.appendChild(sep); }
       card.appendChild(buildSlot(day, slot));
     });
-    // ★ カードをDOMに追加してからrenderTags（getElementById が確実に見つかるように）
     wrap.appendChild(card);
-    SLOTS.forEach(slot => renderTags(day, slot));
+  });
+  // 印刷テーブルのDOMを先に構築してからrenderTags（ptc-* IDが確実に存在する状態で更新）
+  buildPrintTable();
+  DAYS.forEach(day => SLOTS.forEach(slot => renderTags(day, slot)));
+}
+
+/* ══ 印刷テーブル構築 ══ */
+function buildPrintTable() {
+  const tbody = document.getElementById('print-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  DAYS.forEach(function(day) {
+    const tr = document.createElement('tr');
+    const th = document.createElement('td');
+    th.className = 'td-day';
+    th.textContent = day.replace('曜日', '\n曜日');
+    th.style.whiteSpace = 'pre';
+    tr.appendChild(th);
+    SLOTS.forEach(function(slot) {
+      const td = document.createElement('td');
+      td.id = 'ptc-' + day + '-' + slot;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  // セルの描画は buildCards 側の renderTags → updatePrintCell に委譲
+  updatePrintInfo();
+}
+
+/* ══ 印刷テーブルのセル更新 ══ */
+function updatePrintCell(day, slot) {
+  const td = document.getElementById('ptc-' + day + '-' + slot);
+  if (!td) return;
+  td.innerHTML = '';
+  const tags = getTags(day, slot);
+  if (tags.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'pt-tags';
+    tags.forEach(function(t) {
+      const chip = document.createElement('span');
+      chip.className = 'pt-tag ' + slot;
+      chip.textContent = t;
+      wrap.appendChild(chip);
+    });
+    td.appendChild(wrap);
+  } else {
+    const em = document.createElement('span');
+    em.className = 'pt-empty';
+    em.textContent = '─';
+    td.appendChild(em);
+  }
+}
+
+/* ══ 印刷ヘッダー更新 ══ */
+function updatePrintInfo() {
+  const el = document.getElementById('print-info');
+  if (!el) return;
+  el.innerHTML = '';
+  const u = getUserInfo();
+
+  const title = document.createElement('span');
+  title.className = 'pi-title';
+  title.textContent = '週間スケジュール表';
+  el.appendChild(title);
+
+  [['利用者', u.name ? u.name + ' 様' : ''], ['担当者', u.staff], ['期間', u.period]].forEach(function(pair) {
+    if (!pair[1]) return;
+    const f = document.createElement('span');
+    f.className = 'pi-field';
+    const lbl = document.createElement('span');
+    lbl.className = 'pi-label';
+    lbl.textContent = pair[0] + '：';
+    f.appendChild(lbl);
+    f.appendChild(document.createTextNode(pair[1]));
+    el.appendChild(f);
   });
 }
 
@@ -1098,6 +1306,7 @@ function closePreview() { document.getElementById('preview-modal').classList.rem
 /* ══ 印刷 ══ */
 function printSchedule() {
   closePreview();
+  updatePrintInfo(); // 利用者情報を最新化
   setTimeout(function() { window.print(); }, 150);
 }
 
@@ -1455,9 +1664,12 @@ loadUserInfo();
 buildCards();
 document.getElementById('save-status').textContent = 'ブラウザを閉じても内容は保持されます';
 
-// 利用者情報の変更を自動保存
+// 利用者情報の変更を自動保存 + 印刷ヘッダーも同期
 ['user-name','user-staff','user-period'].forEach(id => {
-  document.getElementById(id).addEventListener('change', saveUserInfo);
+  document.getElementById(id).addEventListener('change', function() {
+    saveUserInfo();
+    updatePrintInfo();
+  });
 });
 </script>
 <script>
