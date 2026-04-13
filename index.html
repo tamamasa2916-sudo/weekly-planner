@@ -1186,7 +1186,8 @@ function openPreview() {
 function closePreview() { document.getElementById('preview-modal').classList.remove('open'); }
 
 /* ══ PDFプレビュー ══ */
-var _pdfBlobUrl = null;
+var _pdfBlobUrl  = null;
+var _pdfDataUri  = null;   // iOS向けBase64 DataURI
 var _pdfFilename = '週間スケジュール表.pdf';
 
 function openPdfPreview() {
@@ -1202,8 +1203,9 @@ function openPdfPreview() {
   document.getElementById('pdf-dl-btn').disabled = true;
   setPdfProgress(0, 'PDF を生成中…');
 
-  // 既存BlobURL解放
+  // 既存BlobURL・DataURI解放
   if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
+  _pdfDataUri = null;
 
   // html2pdf.js が未ロードならロード
   function generate() {
@@ -1298,7 +1300,7 @@ function openPdfPreview() {
 
     setPdfProgress(40, 'PDF に変換中…');
 
-    html2pdf()
+    var pdfInstance = html2pdf()
       .set({
         margin: [10, 10, 10, 10],
         filename: _pdfFilename,
@@ -1307,15 +1309,20 @@ function openPdfPreview() {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
         pagebreak: { mode: ['avoid-all'] }
       })
-      .from(container)
-      .outputPdf('blob')
-      .then(function(blob) {
-        document.body.removeChild(container);
-        setPdfProgress(90, 'プレビューを表示中…');
-        _pdfBlobUrl = URL.createObjectURL(blob);
+      .from(container);
+
+    // BlobとDataURIを両方取得（iOS対応）
+    pdfInstance.outputPdf('blob').then(function(blob) {
+      document.body.removeChild(container);
+      setPdfProgress(85, 'プレビューを準備中…');
+      _pdfBlobUrl = URL.createObjectURL(blob);
+
+      // DataURIも生成（iOSはBlobURLでPDFを表示できないため）
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        _pdfDataUri = e.target.result;  // "data:application/pdf;base64,..."
         document.getElementById('pdf-dl-btn').disabled = false;
 
-        // iOSかどうか判定（iOSはiframeでPDF表示不可）
         var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
         setTimeout(function() {
@@ -1323,16 +1330,16 @@ function openPdfPreview() {
           document.getElementById('pdf-loading').style.display = 'none';
 
           if (isIOS) {
-            // iOS：メッセージ表示（タブで開く案内）
             document.getElementById('pdf-mobile-msg').style.display = 'flex';
           } else {
-            // PC / Android：iframeに表示
             var iframe = document.getElementById('pdf-iframe');
             iframe.src = _pdfBlobUrl;
             iframe.classList.add('visible');
           }
         }, 300);
-      })
+      };
+      reader.readAsDataURL(blob);
+    })
       .catch(function(err) {
         console.error('PDF error:', err);
         if (document.body.contains(container)) document.body.removeChild(container);
@@ -1367,30 +1374,47 @@ function closePdfModal() {
   var iframe = document.getElementById('pdf-iframe');
   iframe.classList.remove('visible');
   iframe.src = '';
-  // BlobURLを解放してメモリリークを防ぐ
+  // BlobURLとDataURIを解放してメモリリークを防ぐ
   if (_pdfBlobUrl) {
     URL.revokeObjectURL(_pdfBlobUrl);
     _pdfBlobUrl = null;
   }
+  _pdfDataUri = null;
   document.getElementById('pdf-dl-btn').disabled = true;
 }
 
 function downloadPdf() {
-  if (!_pdfBlobUrl) return;
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var href = isIOS ? _pdfDataUri : _pdfBlobUrl;
+  if (!href) { showToast('⚠️ PDFがまだ準備できていません'); return; }
   var a = document.createElement('a');
-  a.href = _pdfBlobUrl;
+  a.href = href;
   a.download = _pdfFilename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   showToast('💾 PDFを保存しました');
 }
 
 function openPdfTab() {
-  if (!_pdfBlobUrl) return;
-  // iOS SafariではBlobURLの新タブが開けない場合があるためフォールバック
-  var newTab = window.open(_pdfBlobUrl, '_blank');
-  if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-    // フォールバック：現在タブで開く
-    window.location.href = _pdfBlobUrl;
+  // iOS Safari はBlobURLのPDFを表示できないためDataURIを使用
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    if (!_pdfDataUri) { showToast('⚠️ PDFがまだ準備できていません'); return; }
+    // DataURIをBase64デコードしてBlobに変換してから開く
+    // （iOS Safari 15以降はdata:application/pdfを直接開けない場合があるため
+    //   <a>タグにhrefをセットして強制クリック）
+    var a = document.createElement('a');
+    a.href = _pdfDataUri;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } else {
+    if (!_pdfBlobUrl) { showToast('⚠️ PDFがまだ準備できていません'); return; }
+    var newTab = window.open(_pdfBlobUrl, '_blank');
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+      window.location.href = _pdfBlobUrl;
+    }
   }
 }
 
