@@ -1304,10 +1304,101 @@ function openPreview() {
 function closePreview() { document.getElementById('preview-modal').classList.remove('open'); }
 
 /* ══ 印刷 ══ */
+function buildPrintHtml() {
+  var u = getUserInfo();
+  var ICONS = { morning:'🌅 朝', noon:'☀️ 昼', evening:'🌇 夕', night:'🌙 夜' };
+
+  /* 利用者情報ヘッダー */
+  var infoHtml = '';
+  [['利用者', u.name ? u.name + ' 様' : ''],
+   ['担当者', u.staff],
+   ['期間',   u.period]
+  ].forEach(function(p) {
+    if (!p[1]) return;
+    infoHtml += '<span class="fi"><span class="fl">' + escHtml(p[0]) + '：</span>' + escHtml(p[1]) + '</span>';
+  });
+
+  /* テーブル行 */
+  var rowsHtml = DAYS.map(function(day) {
+    var cells = '<td class="dc">' + escHtml(day) + '</td>';
+    SLOTS.forEach(function(slot) {
+      var tags = getTags(day, slot);
+      if (tags.length) {
+        cells += '<td><div class="tw">' +
+          tags.map(function(t) {
+            return '<span class="tc ' + slot + '">' + escHtml(t) + '</span>';
+          }).join('') + '</div></td>';
+      } else {
+        cells += '<td><span class="te">─</span></td>';
+      }
+    });
+    return '<tr>' + cells + '</tr>';
+  }).join('');
+
+  return '<!DOCTYPE html><html lang="ja"><head>' +
+    '<meta charset="UTF-8">' +
+    '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">' +
+    '<style>' +
+    '@page{size:A4 landscape;margin:8mm}' +
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'html,body{width:281mm;height:194mm;font-family:"Noto Sans JP",-apple-system,sans-serif;color:#1c1c1e;background:white}' +
+    'body{display:flex;flex-direction:column}' +
+    '#hd{display:flex;align-items:baseline;gap:5mm;padding-bottom:2mm;' +
+      'border-bottom:.5mm solid #3a3a3c;margin-bottom:2mm;font-size:8pt;flex-shrink:0}' +
+    '.ht{font-size:11pt;font-weight:700;letter-spacing:.06em;margin-right:2mm}' +
+    '.fl{font-weight:700;margin-right:.5mm}.fi{color:#3a3a3c}' +
+    'table{flex:1;width:100%;border-collapse:collapse;table-layout:fixed;min-height:0}' +
+    'col.cd{width:12%}col.cs{width:22%}' +
+    'th,td{border:.3mm solid #aaa;padding:1mm 1.5mm;vertical-align:top;overflow:hidden;' +
+      'font-size:7.5pt;line-height:1.4}' +
+    'thead th{font-weight:700;font-size:8pt;text-align:center;padding:1.5mm;' +
+      'white-space:nowrap;background:#f2f2f7}' +
+    'thead th:first-child{background:#3a3a3c;color:#fff}' +
+    '.hm{color:#856404}.hn{color:#0f5132}.he{color:#084298}.hni{color:#432874}' +
+    'td.dc{font-weight:700;font-size:8.5pt;text-align:center;vertical-align:middle;' +
+      'background:#f2f2f7;white-space:nowrap}' +
+    '.tw{display:flex;flex-wrap:wrap;gap:.8mm;align-content:flex-start}' +
+    '.tc{display:inline-block;font-size:7pt;font-weight:500;padding:.4mm 2mm;' +
+      'border-radius:2px;white-space:nowrap;line-height:1.5}' +
+    '.tc.morning{background:#fff3cd;color:#856404}' +
+    '.tc.noon{background:#d1e7dd;color:#0f5132}' +
+    '.tc.evening{background:#cfe2ff;color:#084298}' +
+    '.tc.night{background:#e2d9f3;color:#432874}' +
+    '.te{color:#aaa;font-size:7pt}' +
+    '</style></head><body>' +
+    '<div id="hd"><span class="ht">週間スケジュール表</span>' + infoHtml + '</div>' +
+    '<table>' +
+    '<colgroup><col class="cd"><col class="cs"><col class="cs"><col class="cs"><col class="cs"></colgroup>' +
+    '<thead><tr>' +
+    '<th>曜日</th>' +
+    '<th class="hm">🌅 朝</th>' +
+    '<th class="hn">☀️ 昼</th>' +
+    '<th class="he">🌇 夕</th>' +
+    '<th class="hni">🌙 夜</th>' +
+    '</tr></thead>' +
+    '<tbody>' + rowsHtml + '</tbody>' +
+    '</table>' +
+    '<script>window.onload=function(){window.print();window.close();};<\/script>' +
+    '</body></html>';
+}
+
 function printSchedule() {
   closePreview();
-  updatePrintInfo(); // 利用者情報を最新化
-  setTimeout(function() { window.print(); }, 150);
+
+  /* 新ウィンドウで印刷（最も確実な方法） */
+  var win = window.open('', '_blank', 'width=1,height=1');
+  if (win) {
+    win.document.open();
+    win.document.write(buildPrintHtml());
+    win.document.close();
+  } else {
+    /* ポップアップブロック時は @media print にフォールバック */
+    updatePrintInfo();
+    setTimeout(function() { window.print(); }, 150);
+    showToast('ポップアップを許可するとより正確に印刷できます');
+  }
 }
 
 /* ══ PDF直接保存 ══ */
