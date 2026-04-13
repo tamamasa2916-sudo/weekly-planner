@@ -2,11 +2,10 @@
    週間スケジュール表 — Service Worker
    キャッシュ戦略: Cache First（オフライン対応）
 ══════════════════════════════════════ */
-'use strict';
 
-const CACHE_NAME = 'schedule-v1';
+const CACHE_NAME = 'schedule-sw-v1';
 
-/* キャッシュ対象ファイル */
+// キャッシュするリソース一覧
 const PRECACHE_URLS = [
   './index.html',
   './manifest.json',
@@ -15,28 +14,35 @@ const PRECACHE_URLS = [
   'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap',
 ];
 
-/* ── インストール: 事前キャッシュ ── */
+/* ── インストール：事前キャッシュ ── */
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      /* フォントなど外部URLは失敗してもインストールを止めない */
-      return cache.addAll(PRECACHE_URLS).catch(function() {
-        return cache.addAll(['./index.html', './manifest.json']);
-      });
+      // フォントなど外部リソースは失敗しても続行
+      return Promise.allSettled(
+        PRECACHE_URLS.map(function(url) {
+          return cache.add(url).catch(function(err) {
+            console.warn('[SW] キャッシュ失敗:', url, err);
+          });
+        })
+      );
     }).then(function() {
+      // 待機せず即アクティブ化
       return self.skipWaiting();
     })
   );
 });
 
-/* ── アクティベート: 古いキャッシュを削除 ── */
+/* ── アクティベート：古いキャッシュを削除 ── */
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys
-          .filter(function(key) { return key !== CACHE_NAME; })
-          .map(function(key) { return caches.delete(key); })
+        keys.filter(function(key) { return key !== CACHE_NAME; })
+            .map(function(key) {
+              console.log('[SW] 古いキャッシュを削除:', key);
+              return caches.delete(key);
+            })
       );
     }).then(function() {
       return self.clients.claim();
@@ -44,18 +50,20 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-/* ── フェッチ: Cache First → Network Fallback ── */
+/* ── フェッチ：Cache First → Network Fallback ── */
 self.addEventListener('fetch', function(event) {
-  /* POST など非GETはスキップ */
+  // POST / chrome-extension などはスキップ
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
 
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       if (cached) return cached;
 
-      /* キャッシュにない場合はネットワーク取得してキャッシュに追加 */
+      // キャッシュになければネットワークから取得してキャッシュに追加
       return fetch(event.request).then(function(response) {
-        /* エラーレスポンスやopaque以外はキャッシュしない */
+        // 正常なレスポンスのみキャッシュ
         if (!response || response.status !== 200 || response.type === 'error') {
           return response;
         }
@@ -65,8 +73,10 @@ self.addEventListener('fetch', function(event) {
         });
         return response;
       }).catch(function() {
-        /* オフライン時はindex.htmlにフォールバック */
-        return caches.match('./index.html');
+        // オフライン時：index.html をフォールバック
+        if (event.request.destination === 'document') {
+          return caches.match('./index.html');
+        }
       });
     })
   );
