@@ -445,10 +445,12 @@
   /* 印刷 */
   @media print {
     body { background: white; padding: 0; }
-    .bottom-bar, .undo-bar, #save-status, .input-area, #page-history { display: none !important; }
+    .bottom-bar, .undo-bar, #save-status, .input-area { display: none !important; }
+    #page-history, #page-options,
+    .modal-overlay, .confirm-overlay, .edit-overlay, .pdf-modal-overlay { display: none !important; }
     .day-card { box-shadow: none; border: 1px solid #ccc; margin-bottom: 10px; break-inside: avoid; }
-    .page { display: block !important; }
-    #page-history { display: none !important; }
+    .page { display: none !important; }
+    #page-main { display: block !important; }
   }
 </style>
 </head>
@@ -512,7 +514,7 @@
     <button class="bar-btn bar-btn-blue"  onclick="showPage('history')">📋 履歴</button>
     <button class="bar-btn bar-btn-ghost" onclick="showPage('options')">⚙️ 項目</button>
     <button class="bar-btn bar-btn-ghost" onclick="document.getElementById('file-input').click()">📂 読込</button>
-    <button class="bar-btn bar-btn-ghost" onclick="openPreview()">👁 出力</button>
+    <button class="bar-btn bar-btn-ghost" onclick="openPreview()">🖨️ 印刷</button>
   </div>
   <div class="bar-row">
     <button class="bar-btn bar-btn-red"   onclick="resetData()">🔄 リセット</button>
@@ -526,15 +528,15 @@
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <span class="modal-title" id="preview-modal-title">📄 出力プレビュー</span>
+      <span class="modal-title" id="preview-modal-title">🖨️ 印刷プレビュー</span>
       <button class="modal-close" onclick="closePreview()" aria-label="プレビューを閉じる">✕</button>
     </div>
     <div class="modal-body" id="preview-body"></div>
     <div class="modal-footer">
       <button class="modal-btn modal-btn-cancel" onclick="closePreview()">閉じる</button>
-      <button class="modal-btn modal-btn-print" onclick="openPdfPreview()">📄 PDFプレビュー</button>
-      <button class="modal-btn modal-btn-txt"   onclick="exportTxt()">📄 テキスト</button>
-      <button class="modal-btn modal-btn-json"  onclick="exportJson()">📥 JSON</button>
+      <button class="modal-btn modal-btn-print"  onclick="printSchedule()">🖨️ 印刷する</button>
+      <button class="modal-btn modal-btn-txt"    onclick="exportTxt()">📄 テキスト</button>
+      <button class="modal-btn modal-btn-json"   onclick="savePdfDirect()">📥 PDF保存</button>
     </div>
   </div>
 </div>
@@ -1185,6 +1187,133 @@ function openPreview() {
 
 function closePreview() { document.getElementById('preview-modal').classList.remove('open'); }
 
+/* ══ 印刷 ══ */
+function printSchedule() {
+  closePreview();
+  setTimeout(function() { window.print(); }, 150);
+}
+
+/* ══ PDF直接保存 ══ */
+function savePdfDirect() {
+  closePreview();
+  showToast('📄 PDF生成中…');
+
+  function generate() {
+    var u = getUserInfo();
+    var ICONS = { morning:'🌅 朝', noon:'☀️ 昼', evening:'🌇 夕', night:'🌙 夜' };
+
+    var infoHtml = '';
+    if (u.name)   infoHtml += '<div><strong>利用者氏名：</strong>' + escHtml(u.name) + ' 様</div>';
+    if (u.staff)  infoHtml += '<div><strong>担当者名：</strong>' + escHtml(u.staff) + '</div>';
+    if (u.period) infoHtml += '<div><strong>対象期間：</strong>' + escHtml(u.period) + '</div>';
+
+    var filename = '週間スケジュール表';
+    if (u.name)   filename = u.name + '_' + filename;
+    if (u.period) filename = filename + '_' + u.period;
+    filename += '.pdf';
+
+    var slotCounts = SLOTS.map(function(slot) {
+      return DAYS.reduce(function(sum, day) { return sum + getTags(day, slot).length; }, 0);
+    });
+    var totalTags = slotCounts.reduce(function(a,b){return a+b;},0) || SLOTS.length;
+    var DAY_COL_PCT = 11, MIN_SLOT_PCT = 12;
+    var remaining = 100 - DAY_COL_PCT;
+    var slotWidths = slotCounts.map(function(c) {
+      return Math.max(MIN_SLOT_PCT, Math.round((c / totalTags) * remaining));
+    });
+    var widthSum = slotWidths.reduce(function(a,b){return a+b;},0);
+    var maxIdx = slotWidths.indexOf(Math.max.apply(null, slotWidths));
+    slotWidths[maxIdx] += remaining - widthSum;
+
+    var colGroupHtml = '<colgroup><col style="width:' + DAY_COL_PCT + '%">' +
+      slotWidths.map(function(w){ return '<col style="width:' + w + '%">'; }).join('') + '</colgroup>';
+
+    var rowsHtml = '';
+    DAYS.forEach(function(day) {
+      var tdHtml = '<td class="td-day">' + escHtml(day) + '</td>';
+      SLOTS.forEach(function(slot) {
+        var tags = getTags(day, slot);
+        if (tags.length) {
+          var tagsHtml = tags.map(function(t){ return '<span class="tag tag-' + slot + '">' + escHtml(t) + '</span>'; }).join('');
+          tdHtml += '<td><div>' + tagsHtml + '</div></td>';
+        } else {
+          tdHtml += '<td><span class="empty-cell">─</span></td>';
+        }
+      });
+      rowsHtml += '<tr>' + tdHtml + '</tr>';
+    });
+
+    var container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:277mm;font-family:\'Noto Sans JP\',-apple-system,sans-serif;color:#1c1c1e;';
+    container.innerHTML = '<style>' +
+      '*{box-sizing:border-box;margin:0;padding:0}' +
+      'h1{font-size:13pt;font-weight:700;letter-spacing:0.06em;margin-bottom:2.5mm}' +
+      '.info{font-size:8.5pt;line-height:1.8;margin-bottom:3mm;padding:1.5mm 4mm;background:#f2f2f7;border-radius:3px;display:flex;gap:10mm;flex-wrap:wrap}' +
+      '.info strong{font-weight:700}' +
+      'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
+      'th,td{border:0.35mm solid #b0b0b4;padding:1.8mm 2.5mm;vertical-align:top;text-align:left;word-break:break-all;font-size:8.5pt;line-height:1.5;overflow:hidden}' +
+      'thead th{background:#f2f2f7;font-weight:700;text-align:center;font-size:9pt;white-space:nowrap;padding:2mm 2.5mm}' +
+      'thead th:first-child{background:#3a3a3c;color:white}' +
+      '.morning{color:#856404} .noon{color:#0f5132} .evening{color:#084298} .night{color:#432874}' +
+      'td.td-day{font-weight:700;text-align:center;background:#f2f2f7;white-space:nowrap;vertical-align:middle;font-size:9pt}' +
+      'td>div{display:flex;flex-wrap:wrap;gap:1mm;align-content:flex-start}' +
+      '.tag{display:inline-block;font-size:8pt;font-weight:500;padding:0.6mm 2.2mm;border-radius:2px;white-space:nowrap}' +
+      '.empty-cell{color:#aaa;font-size:8pt}' +
+      '.tag-morning{background:#fff3cd;color:#856404} .tag-noon{background:#d1e7dd;color:#0f5132}' +
+      '.tag-evening{background:#cfe2ff;color:#084298} .tag-night{background:#e2d9f3;color:#432874}' +
+      '</style>' +
+      '<h1>週間スケジュール表</h1>' +
+      (infoHtml ? '<div class="info">' + infoHtml + '</div>' : '') +
+      '<table>' + colGroupHtml + '<thead><tr><th>曜日</th>' +
+      ['morning','noon','evening','night'].map(function(s){ return '<th class="' + s + '">' + ICONS[s] + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+
+    document.body.appendChild(container);
+
+    var rows = Array.from(container.querySelectorAll('tbody tr'));
+    var MM = 96 / 25.4;
+    var PAGE_H = 190 * MM;
+    var usedH = 0;
+    ['h1','.info','thead'].forEach(function(sel) {
+      var el = container.querySelector(sel);
+      if (el) usedH += el.getBoundingClientRect().height;
+    });
+    var rowH = Math.max(22, Math.floor((PAGE_H - usedH - rows.length) / rows.length));
+    rows.forEach(function(r) { r.style.height = rowH + 'px'; r.style.maxHeight = rowH + 'px'; });
+
+    html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.97 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak: { mode: ['avoid-all'] }
+      })
+      .from(container)
+      .save()
+      .then(function() {
+        document.body.removeChild(container);
+        showToast('💾 PDFを保存しました');
+      })
+      .catch(function(err) {
+        console.error('PDF error:', err);
+        if (document.body.contains(container)) document.body.removeChild(container);
+        showToast('⚠️ PDF生成に失敗しました');
+      });
+  }
+
+  if (typeof html2pdf === 'undefined') {
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    script.onload = generate;
+    script.onerror = function() { showToast('⚠️ ライブラリの読み込みに失敗しました'); };
+    document.head.appendChild(script);
+  } else {
+    generate();
+  }
+}
+
 /* ══ PDFプレビュー ══ */
 var _pdfBlobUrl  = null;
 var _pdfDataUri  = null;   // iOS向けBase64 DataURI
@@ -1586,9 +1715,13 @@ function editTag(day, slot, oldValue) {
   newInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); doSave(); }
   });
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) close();
-  }, { once: true });
+  function onOverlayClick(e) {
+    if (e.target === overlay) { close(); overlay.removeEventListener('click', onOverlayClick); }
+  }
+  overlay.addEventListener('click', onOverlayClick);
+
+  var _origClose = close;
+  close = function() { overlay.removeEventListener('click', onOverlayClick); _origClose(); };
 
   function doSave() {
     var newValue = newInput.value.trim();
@@ -1631,10 +1764,11 @@ function showConfirm(title, msg, okLabel, okClass, onOk) {
   okBtn.parentNode.replaceChild(newOk, okBtn);
   cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
 
-  function close() { overlay.classList.remove('open'); }
+  function close() { overlay.classList.remove('open'); overlay.removeEventListener('click', onOverlayClick); }
+  function onOverlayClick(e) { if (e.target === overlay) close(); }
+  overlay.addEventListener('click', onOverlayClick);
   newOk.addEventListener('click', function() { close(); onOk(); });
   newCancel.addEventListener('click', close);
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); }, { once: true });
 }
 
 let toastTimer = null;
