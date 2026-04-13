@@ -1229,21 +1229,43 @@ ${infoHtml ? `<div class="info">${infoHtml}</div>` : ''}
   </thead>
   <tbody>${rowsHtml}</tbody>
 </table>
+<div id="status" style="
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(255,255,255,0.92); z-index:9999; font-family:-apple-system,sans-serif;
+">
+  <div style="font-size:15px; font-weight:600; color:#1c1c1e; margin-bottom:10px;">📄 PDF を生成中...</div>
+  <div style="width:200px; height:6px; background:#e5e5ea; border-radius:3px; overflow:hidden;">
+    <div id="prog" style="height:100%; width:0%; background:#c4704a; border-radius:3px; transition:width 0.3s;"></div>
+  </div>
+  <div id="status-msg" style="font-size:12px; color:#8e8e93; margin-top:10px;">レイアウトを計算中…</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <script>
-// A4横 余白10mm → コンテンツ幅277mm・高190mm を基準に自動倍率調整
+var prog       = document.getElementById('prog');
+var statusMsg  = document.getElementById('status');
+var msgEl      = document.getElementById('status-msg');
+
+function setProgress(pct, msg) {
+  prog.style.width = pct + '%';
+  if (msg) msgEl.textContent = msg;
+}
+
 document.fonts.ready.then(function() {
   var MM     = 96 / 25.4;
-  var PAGE_W = 277 * MM;   // 約1047px
-  var PAGE_H = 190 * MM;   // 約 718px
+  var PAGE_W = 277 * MM;
+  var PAGE_H = 190 * MM;
 
   function outerH(sel) {
     var el = document.querySelector(sel);
     if (!el) return 0;
     var s = getComputedStyle(el);
     return el.getBoundingClientRect().height
-      + (parseFloat(s.marginTop)    || 0)
+      + (parseFloat(s.marginTop) || 0)
       + (parseFloat(s.marginBottom) || 0);
   }
+
+  setProgress(15, '行の高さを調整中…');
 
   // Step 1: 全7行を均等高さに固定
   var rows = Array.from(document.querySelectorAll('tbody tr'));
@@ -1254,19 +1276,68 @@ document.fonts.ready.then(function() {
     r.style.maxHeight = rowH + 'px';
   });
 
-  // Step 2: レイアウト確定後にコンテンツ実寸を測定して倍率を算出
   requestAnimationFrame(function() {
+    // Step 2: 自動倍率
     var cW    = document.documentElement.scrollWidth;
     var cH    = document.documentElement.scrollHeight;
     var scale = Math.min(PAGE_W / cW, PAGE_H / cH);
-    scale     = Math.min(Math.max(scale, 0.3), 2.0); // 30%〜200%に制限
-
-    // 1%以上ズレがあるときだけ適用（不要な再描画を避ける）
+    scale     = Math.min(Math.max(scale, 0.3), 2.0);
     if (Math.abs(scale - 1) > 0.01) {
       document.body.style.zoom = scale;
     }
 
-    requestAnimationFrame(function() { window.print(); });
+    setProgress(35, 'ページをレンダリング中…');
+
+    // ファイル名（利用者氏名＋対象期間があれば付与）
+    var meta   = document.querySelector('.info');
+    var fname  = '週間スケジュール表';
+    if (meta) {
+      var txt = meta.textContent.replace(/\s+/g, ' ').trim();
+      // 利用者氏名を抽出
+      var m = txt.match(/利用者氏名[：:]\s*([^\s　様]+)/);
+      if (m) fname = m[1] + '_' + fname;
+      // 対象期間を抽出
+      var p = txt.match(/対象期間[：:]\s*([^\s　]+)/);
+      if (p) fname = fname + '_' + p[1];
+    }
+
+    requestAnimationFrame(function() {
+      setProgress(50, 'PDF に変換中…');
+
+      // Step 3: html2pdf でPDF生成→保存→印刷
+      var target = document.body.cloneNode(true);
+      target.querySelector('#status').remove(); // オーバーレイを除外
+
+      html2pdf()
+        .set({
+          margin:      [10, 10, 10, 10],
+          filename:    fname + '.pdf',
+          image:       { type: 'jpeg', quality: 0.97 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+          pagebreak:   { mode: ['avoid-all'] }
+        })
+        .from(target)
+        .toPdf()
+        .get('pdf')
+        .then(function(pdf) {
+          setProgress(90, 'PDF を保存中…');
+          return pdf;
+        })
+        .save()
+        .then(function() {
+          setProgress(100, '✅ PDF を保存しました。印刷ダイアログを開きます…');
+          setTimeout(function() {
+            document.getElementById('status').style.display = 'none';
+            window.print();
+          }, 800);
+        })
+        .catch(function(err) {
+          console.error('PDF error:', err);
+          document.getElementById('status').style.display = 'none';
+          window.print();
+        });
+    });
   });
 });
 <\/script>
