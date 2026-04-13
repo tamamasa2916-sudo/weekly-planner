@@ -12,12 +12,14 @@
 <!-- PWA manifest -->
 <link rel="manifest" href="manifest.json">
 
-<!-- iOS ホーム画面アイコン -->
-<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+<!-- Google Fonts（preconnect で高速化） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap">
 
+<!-- iOS ホーム画面アイコン（180x180 が iPhone 標準） -->
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<style>
   :root {
     --bg: #f2f2f7;
     --card: #ffffff;
@@ -77,7 +79,7 @@
   .day-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
   .day-header { background: var(--ink2); color: #fff; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.1em; padding: 11px 16px; }
   .slot-section { border-top: 1px solid var(--bg); }
-  .slot-section:first-of-type { border-top: none; }
+  .day-header + .slot-section { border-top: none; }
   .slot-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px 6px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; }
   .slot-header.morning { color: var(--morning-ink); }
   .slot-header.noon    { color: var(--noon-ink); }
@@ -291,7 +293,7 @@
   .modal-btn-cancel { background: var(--bg); color: var(--ink2); }
   .modal-btn-print  { background: #edfaf1; color: #1a7a3a; border: 1px solid #9adcb4; }
   .modal-btn-txt    { background: #e8f2ff; color: var(--blue); }
-  .modal-btn-json   { background: var(--accent); color: white; }
+  .modal-btn-pdf    { background: var(--accent); color: white; }
 
   /* ══ プルダウン管理ページ ══ */
   .opts-slot-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -375,72 +377,6 @@
   }
   .user-field-input:focus { border-color: var(--blue); }
   .user-field-input::placeholder { color: var(--muted); font-size: 0.82rem; }
-
-  /* ══ PDFプレビューモーダル ══ */
-  .pdf-modal-overlay {
-    display: none; position: fixed; inset: 0; z-index: 1000;
-    background: #000;
-    flex-direction: column;
-  }
-  .pdf-modal-overlay.open { display: flex; }
-
-  .pdf-modal-sheet {
-    display: flex; flex-direction: column;
-    width: 100%; height: 100%;
-    background: #1c1c1e;
-  }
-
-  .pdf-modal-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: calc(var(--safe-t) + 10px) 16px 10px;
-    background: #2c2c2e;
-    flex-shrink: 0; min-height: 54px;
-    border-bottom: 1px solid #3a3a3c;
-  }
-  .pdf-modal-back {
-    height: 36px; padding: 0 14px; font-family: inherit; font-size: 0.9rem; font-weight: 600;
-    color: var(--blue); background: transparent; border: none; cursor: pointer;
-  }
-  .pdf-modal-back:active { opacity: 0.6; }
-  .pdf-modal-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
-  .pdf-modal-dl {
-    height: 36px; padding: 0 14px; font-family: inherit; font-size: 0.85rem; font-weight: 700;
-    color: #fff; background: var(--accent); border: none; border-radius: 8px; cursor: pointer;
-  }
-  .pdf-modal-dl:disabled { background: #3a3a3c; color: #636366; cursor: default; }
-  .pdf-modal-dl:not(:disabled):active { opacity: 0.75; }
-
-  /* ローディング */
-  .pdf-loading {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    flex: 1; gap: 14px; padding: 40px 20px;
-  }
-  .pdf-loading-icon { font-size: 2.5rem; animation: pdfPulse 1.2s ease-in-out infinite; }
-  @keyframes pdfPulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.92); } }
-  .pdf-loading-text { font-size: 0.9rem; color: #ebebf5cc; font-weight: 600; }
-  .pdf-progress-wrap { width: 200px; height: 5px; background: #3a3a3c; border-radius: 3px; overflow: hidden; }
-  .pdf-progress-bar  { height: 100%; width: 0%; background: var(--accent); border-radius: 3px; transition: width 0.35s ease; }
-
-  /* iframe */
-  .pdf-iframe {
-    display: none; flex: 1; border: none; width: 100%; background: #525659;
-  }
-  .pdf-iframe.visible { display: block; }
-
-  /* スマホ向けメッセージ */
-  .pdf-mobile-msg {
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 12px; padding: 40px 30px; text-align: center;
-  }
-  .pdf-mobile-icon { font-size: 3rem; }
-  .pdf-mobile-text { font-size: 1.1rem; font-weight: 700; color: #fff; }
-  .pdf-mobile-sub  { font-size: 0.82rem; color: #ebebf599; line-height: 1.6; }
-  .pdf-open-btn {
-    margin-top: 8px; height: 48px; padding: 0 28px;
-    font-family: inherit; font-size: 0.95rem; font-weight: 700;
-    color: #fff; background: var(--blue); border: none; border-radius: 12px; cursor: pointer;
-  }
-  .pdf-open-btn:active { opacity: 0.75; }
 
   /* 印刷 */
   @media print {
@@ -536,35 +472,7 @@
       <button class="modal-btn modal-btn-cancel" onclick="closePreview()">閉じる</button>
       <button class="modal-btn modal-btn-print"  onclick="printSchedule()">🖨️ 印刷する</button>
       <button class="modal-btn modal-btn-txt"    onclick="exportTxt()">📄 テキスト</button>
-      <button class="modal-btn modal-btn-json"   onclick="savePdfDirect()">📥 PDF保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ PDFプレビューモーダル ══ -->
-<div class="pdf-modal-overlay" id="pdf-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title">
-  <div class="pdf-modal-sheet">
-    <div class="pdf-modal-header">
-      <button class="pdf-modal-back" onclick="closePdfModal()" aria-label="PDFプレビューを閉じる">‹ 戻る</button>
-      <span class="pdf-modal-title" id="pdf-modal-title">📄 PDFプレビュー</span>
-      <button class="pdf-modal-dl" id="pdf-dl-btn" onclick="downloadPdf()" disabled aria-label="PDFをダウンロード">⬇ 保存</button>
-    </div>
-    <!-- ローディング表示 -->
-    <div class="pdf-loading" id="pdf-loading">
-      <div class="pdf-loading-icon">📄</div>
-      <div class="pdf-loading-text" id="pdf-loading-text">PDF を生成中…</div>
-      <div class="pdf-progress-wrap">
-        <div class="pdf-progress-bar" id="pdf-progress-bar"></div>
-      </div>
-    </div>
-    <!-- iframeプレビュー（PC/Android） -->
-    <iframe class="pdf-iframe" id="pdf-iframe" title="PDFプレビュー"></iframe>
-    <!-- スマホ向けメッセージ -->
-    <div class="pdf-mobile-msg" id="pdf-mobile-msg" style="display:none">
-      <div class="pdf-mobile-icon">✅</div>
-      <div class="pdf-mobile-text">PDFの準備ができました</div>
-      <div class="pdf-mobile-sub">「保存」ボタンでダウンロード、または下のボタンで開けます</div>
-      <button class="pdf-open-btn" id="pdf-open-btn" onclick="openPdfTab()">🔗 PDFを開く</button>
+      <button class="modal-btn modal-btn-pdf"   onclick="savePdfDirect()">📥 PDF保存</button>
     </div>
   </div>
 </div>
@@ -595,7 +503,7 @@
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 'use strict';
@@ -1314,239 +1222,6 @@ function savePdfDirect() {
   }
 }
 
-/* ══ PDFプレビュー ══ */
-var _pdfBlobUrl  = null;
-var _pdfDataUri  = null;   // iOS向けBase64 DataURI
-var _pdfFilename = '週間スケジュール表.pdf';
-
-function openPdfPreview() {
-  closePreview();
-  var overlay = document.getElementById('pdf-modal-overlay');
-  overlay.classList.add('open');
-
-  // 状態リセット
-  document.getElementById('pdf-loading').style.display = 'flex';
-  document.getElementById('pdf-iframe').classList.remove('visible');
-  document.getElementById('pdf-iframe').src = '';
-  document.getElementById('pdf-mobile-msg').style.display = 'none';
-  document.getElementById('pdf-dl-btn').disabled = true;
-  setPdfProgress(0, 'PDF を生成中…');
-
-  // 既存BlobURL・DataURI解放
-  if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
-  _pdfDataUri = null;
-
-  // html2pdf.js が未ロードならロード
-  function generate() {
-    var u = getUserInfo();
-    var ICONS = { morning:'🌅 朝', noon:'☀️ 昼', evening:'🌇 夕', night:'🌙 夜' };
-
-    // 利用者情報HTML
-    var infoHtml = '';
-    if (u.name)   infoHtml += '<div><strong>利用者氏名：</strong>' + escHtml(u.name) + ' 様</div>';
-    if (u.staff)  infoHtml += '<div><strong>担当者名：</strong>' + escHtml(u.staff) + '</div>';
-    if (u.period) infoHtml += '<div><strong>対象期間：</strong>' + escHtml(u.period) + '</div>';
-
-    // ファイル名生成
-    _pdfFilename = '週間スケジュール表';
-    if (u.name)   _pdfFilename = u.name + '_' + _pdfFilename;
-    if (u.period) _pdfFilename = _pdfFilename + '_' + u.period;
-    _pdfFilename += '.pdf';
-
-    // テーブルHTML生成
-    var slotCounts = SLOTS.map(function(slot) {
-      return DAYS.reduce(function(sum, day) { return sum + getTags(day, slot).length; }, 0);
-    });
-    var totalTags = slotCounts.reduce(function(a,b){return a+b;},0) || SLOTS.length;
-    var DAY_COL_PCT = 11, MIN_SLOT_PCT = 12;
-    var remaining = 100 - DAY_COL_PCT;
-    var slotWidths = slotCounts.map(function(c) {
-      return Math.max(MIN_SLOT_PCT, Math.round((c / totalTags) * remaining));
-    });
-    var widthSum = slotWidths.reduce(function(a,b){return a+b;},0);
-    var maxIdx = slotWidths.indexOf(Math.max.apply(null, slotWidths));
-    slotWidths[maxIdx] += remaining - widthSum;
-
-    var colGroupHtml = '<colgroup><col style="width:' + DAY_COL_PCT + '%">' +
-      slotWidths.map(function(w){ return '<col style="width:' + w + '%">'; }).join('') + '</colgroup>';
-
-    var rowsHtml = '';
-    DAYS.forEach(function(day) {
-      var tdHtml = '<td class="td-day">' + escHtml(day) + '</td>';
-      SLOTS.forEach(function(slot) {
-        var tags = getTags(day, slot);
-        if (tags.length) {
-          var tagsHtml = tags.map(function(t){ return '<span class="tag tag-' + slot + '">' + escHtml(t) + '</span>'; }).join('');
-          tdHtml += '<td><div>' + tagsHtml + '</div></td>';
-        } else {
-          tdHtml += '<td><span class="empty-cell">─</span></td>';
-        }
-      });
-      rowsHtml += '<tr>' + tdHtml + '</tr>';
-    });
-
-    // 印刷用HTMLを隠しdivに構築
-    var container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:277mm;font-family:\'Noto Sans JP\',-apple-system,sans-serif;color:#1c1c1e;';
-    container.innerHTML = '<style>' +
-      '*{box-sizing:border-box;margin:0;padding:0}' +
-      'h1{font-size:13pt;font-weight:700;letter-spacing:0.06em;margin-bottom:2.5mm}' +
-      '.info{font-size:8.5pt;line-height:1.8;margin-bottom:3mm;padding:1.5mm 4mm;background:#f2f2f7;border-radius:3px;display:flex;gap:10mm;flex-wrap:wrap}' +
-      '.info strong{font-weight:700}' +
-      'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
-      'th,td{border:0.35mm solid #b0b0b4;padding:1.8mm 2.5mm;vertical-align:top;text-align:left;word-break:break-all;font-size:8.5pt;line-height:1.5;overflow:hidden}' +
-      'thead th{background:#f2f2f7;font-weight:700;text-align:center;font-size:9pt;white-space:nowrap;padding:2mm 2.5mm}' +
-      'thead th:first-child{background:#3a3a3c;color:white}' +
-      '.morning{color:#856404} .noon{color:#0f5132} .evening{color:#084298} .night{color:#432874}' +
-      'td.td-day{font-weight:700;text-align:center;background:#f2f2f7;white-space:nowrap;vertical-align:middle;font-size:9pt}' +
-      'td>div{display:flex;flex-wrap:wrap;gap:1mm;align-content:flex-start}' +
-      '.tag{display:inline-block;font-size:8pt;font-weight:500;padding:0.6mm 2.2mm;border-radius:2px;white-space:nowrap}' +
-      '.empty-cell{color:#aaa;font-size:8pt}' +
-      '.tag-morning{background:#fff3cd;color:#856404} .tag-noon{background:#d1e7dd;color:#0f5132}' +
-      '.tag-evening{background:#cfe2ff;color:#084298} .tag-night{background:#e2d9f3;color:#432874}' +
-      '</style>' +
-      '<h1>週間スケジュール表</h1>' +
-      (infoHtml ? '<div class="info">' + infoHtml + '</div>' : '') +
-      '<table>' + colGroupHtml + '<thead><tr><th>曜日</th>' +
-      ['morning','noon','evening','night'].map(function(s){ return '<th class="' + s + '">' + ICONS[s] + '</th>'; }).join('') +
-      '</tr></thead><tbody>' + rowsHtml + '</tbody></table>';
-
-    document.body.appendChild(container);
-
-    setPdfProgress(20, 'レイアウトを計算中…');
-
-    // 行高を均等調整
-    var rows = Array.from(container.querySelectorAll('tbody tr'));
-    var MM = 96 / 25.4;
-    var PAGE_H = 190 * MM;
-    var usedH = 0;
-    ['h1','.info','thead'].forEach(function(sel) {
-      var el = container.querySelector(sel);
-      if (el) usedH += el.getBoundingClientRect().height;
-    });
-    var rowH = Math.max(22, Math.floor((PAGE_H - usedH - rows.length) / rows.length));
-    rows.forEach(function(r) { r.style.height = rowH + 'px'; r.style.maxHeight = rowH + 'px'; });
-
-    setPdfProgress(40, 'PDF に変換中…');
-
-    var pdfInstance = html2pdf()
-      .set({
-        margin: [10, 10, 10, 10],
-        filename: _pdfFilename,
-        image: { type: 'jpeg', quality: 0.97 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['avoid-all'] }
-      })
-      .from(container);
-
-    // BlobとDataURIを両方取得（iOS対応）
-    pdfInstance.outputPdf('blob').then(function(blob) {
-      document.body.removeChild(container);
-      setPdfProgress(85, 'プレビューを準備中…');
-      _pdfBlobUrl = URL.createObjectURL(blob);
-
-      // DataURIも生成（iOSはBlobURLでPDFを表示できないため）
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        _pdfDataUri = e.target.result;  // "data:application/pdf;base64,..."
-        document.getElementById('pdf-dl-btn').disabled = false;
-
-        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-        setTimeout(function() {
-          setPdfProgress(100, '完了');
-          document.getElementById('pdf-loading').style.display = 'none';
-
-          if (isIOS) {
-            document.getElementById('pdf-mobile-msg').style.display = 'flex';
-          } else {
-            var iframe = document.getElementById('pdf-iframe');
-            iframe.src = _pdfBlobUrl;
-            iframe.classList.add('visible');
-          }
-        }, 300);
-      };
-      reader.readAsDataURL(blob);
-    })
-      .catch(function(err) {
-        console.error('PDF error:', err);
-        if (document.body.contains(container)) document.body.removeChild(container);
-        document.getElementById('pdf-loading').style.display = 'none';
-        document.getElementById('pdf-mobile-msg').style.display = 'flex';
-        document.getElementById('pdf-mobile-text') && (document.getElementById('pdf-mobile-text').textContent = '⚠️ 生成に失敗しました');
-        showToast('⚠️ PDF生成に失敗しました');
-      });
-  }
-
-  if (typeof html2pdf === 'undefined') {
-    setPdfProgress(5, 'ライブラリを読み込み中…');
-    var script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-    script.onload = generate;
-    script.onerror = function() { showToast('⚠️ ライブラリの読み込みに失敗しました'); closePdfModal(); };
-    document.head.appendChild(script);
-  } else {
-    generate();
-  }
-}
-
-function setPdfProgress(pct, msg) {
-  var bar = document.getElementById('pdf-progress-bar');
-  var txt = document.getElementById('pdf-loading-text');
-  if (bar) bar.style.width = pct + '%';
-  if (txt && msg) txt.textContent = msg;
-}
-
-function closePdfModal() {
-  document.getElementById('pdf-modal-overlay').classList.remove('open');
-  var iframe = document.getElementById('pdf-iframe');
-  iframe.classList.remove('visible');
-  iframe.src = '';
-  // BlobURLとDataURIを解放してメモリリークを防ぐ
-  if (_pdfBlobUrl) {
-    URL.revokeObjectURL(_pdfBlobUrl);
-    _pdfBlobUrl = null;
-  }
-  _pdfDataUri = null;
-  document.getElementById('pdf-dl-btn').disabled = true;
-}
-
-function downloadPdf() {
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  var href = isIOS ? _pdfDataUri : _pdfBlobUrl;
-  if (!href) { showToast('⚠️ PDFがまだ準備できていません'); return; }
-  var a = document.createElement('a');
-  a.href = href;
-  a.download = _pdfFilename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  showToast('💾 PDFを保存しました');
-}
-
-function openPdfTab() {
-  // iOS Safari はBlobURLのPDFを表示できないためDataURIを使用
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if (isIOS) {
-    if (!_pdfDataUri) { showToast('⚠️ PDFがまだ準備できていません'); return; }
-    // DataURIをBase64デコードしてBlobに変換してから開く
-    // （iOS Safari 15以降はdata:application/pdfを直接開けない場合があるため
-    //   <a>タグにhrefをセットして強制クリック）
-    var a = document.createElement('a');
-    a.href = _pdfDataUri;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } else {
-    if (!_pdfBlobUrl) { showToast('⚠️ PDFがまだ準備できていません'); return; }
-    var newTab = window.open(_pdfBlobUrl, '_blank');
-    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-      window.location.href = _pdfBlobUrl;
-    }
-  }
-}
-
 function escHtml(str) {
   return String(str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -1623,12 +1298,6 @@ function exportTxt() {
   closePreview(); showToast('テキストを出力しました');
 }
 
-function exportJson() {
-  const exportData = { user: getUserInfo(), schedule: data };
-  dl(JSON.stringify(exportData, null, 2), '週間スケジュール.json', 'application/json');
-  closePreview(); showToast('JSONをエクスポートしました');
-}
-
 /* ══ その他アクション ══ */
 function resetData() {
   showConfirm(
@@ -1656,7 +1325,7 @@ function importData(e) {
     let scheduleData, userData = null;
     try {
       const parsed = JSON.parse(ev.target.result);
-      if (typeof parsed !== 'object' || Array.isArray(parsed) || !parsed) throw 0;
+      if (typeof parsed !== 'object' || Array.isArray(parsed) || !parsed) throw new Error('invalid');
 
       // 新形式: { user:{...}, schedule:{...} }
       if (parsed.schedule && typeof parsed.schedule === 'object' && !Array.isArray(parsed.schedule)) {
@@ -1668,7 +1337,7 @@ function importData(e) {
       }
       // スケジュールデータの検証
       Object.values(scheduleData).forEach(v => {
-        if (!Array.isArray(v) || !v.every(i => typeof i === 'string')) throw 0;
+        if (!Array.isArray(v) || !v.every(i => typeof i === 'string')) throw new Error('invalid');
       });
     } catch { showToast('⚠️ ファイル形式が正しくありません'); e.target.value=''; return; }
 
@@ -1711,17 +1380,18 @@ function editTag(day, slot, oldValue) {
   setTimeout(function() { newInput.focus(); newInput.select(); }, 100);
 
   newSave.addEventListener('click', doSave);
-  newCancel.addEventListener('click', close);
   newInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); doSave(); }
   });
   function onOverlayClick(e) {
-    if (e.target === overlay) { close(); overlay.removeEventListener('click', onOverlayClick); }
+    if (e.target === overlay) close();
   }
   overlay.addEventListener('click', onOverlayClick);
 
+  // close を再定義してリスナー解除も担わせる（再定義後に cancel を登録）
   var _origClose = close;
   close = function() { overlay.removeEventListener('click', onOverlayClick); _origClose(); };
+  newCancel.addEventListener('click', close);
 
   function doSave() {
     var newValue = newInput.value.trim();
