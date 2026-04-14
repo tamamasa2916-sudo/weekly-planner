@@ -1459,57 +1459,54 @@ function buildPrintHtml() {
   ].join('');
 }
 
-/* ══ 印刷する（PC）
-   window.print() を直接呼び出す。
-   @media print CSS が #print-view を表示し、他要素をすべて非表示にする。
-   iframe・ポップアップ・外部ライブラリ不要で最も確実な方法。
-══════════════════════════════════════════════════════════════════════════ */
-function printSchedule() {
-  closePreview();
-  updatePrintInfo();   // #print-info DOM を最新化
-  window.print();
-}
-
-/* ══ PDF保存
-   buildPrintHtml() で生成した印刷用HTMLを Blob URL として新タブで開く。
-   新タブでフォント読み込み完了後に自動的に印刷ダイアログを表示。
-   印刷ダイアログの「送信先」→「PDFとして保存」でPDF化できる。
-   html2canvas/jsPDF 不要・純粋なブラウザAPIのみ。
-══════════════════════════════════════════════════════════════════════════ */
-function savePdfDirect() {
+/* ══ 隠し iframe を使った直接印刷
+   ──────────────────────────────────────────────────────────────────────
+   新タブ・ダウンロード不要。buildPrintHtml() の内容を非表示 iframe に
+   書き込み、フォント読み込み完了後に iframe.contentWindow.print() を呼ぶ。
+   印刷ダイアログが直接開き、「PDFとして保存」も選択できる。
+   ────────────────────────────────────────────────────────────────────── */
+function _printViaIframe(mode) {
   closePreview();
 
-  const u = getUserInfo();
-  // 印刷用HTMLにフォント待機＋自動print スクリプトを埋め込む
-  const html = buildPrintHtml().replace('</body></html>',
-    '<script>' +
-    'document.fonts.ready.then(function(){' +
-    '  window.focus();' +
-    '  window.print();' +
-    '});<\/script>' +
-    '</body></html>'
-  );
+  // 既存の印刷用 iframe があれば除去
+  var old = document.getElementById('_print_iframe');
+  if (old) old.parentNode.removeChild(old);
 
-  // Blob URL 経由で新タブを開く（ユーザー操作起点のため通常ブロックされない）
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const win  = window.open(url, '_blank');
+  var iframe = document.createElement('iframe');
+  iframe.id = '_print_iframe';
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden;';
+  document.body.appendChild(iframe);
 
-  if (!win) {
-    // ポップアップが blocked された場合は HTML ファイルとしてダウンロード
-    let fname = '週間スケジュール表';
-    if (u.name)   fname = u.name + '_' + fname;
-    if (u.period) fname = fname + '_' + u.period;
-    const a = document.createElement('a');
-    a.href = url; a.download = fname + '.html';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    showToast('HTMLファイルを開いて印刷→PDFとして保存 してください');
-  } else {
+  var html = buildPrintHtml();
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+
+  // フォント読み込み完了後に印刷ダイアログを起動
+  iframe.contentDocument.fonts.ready.then(function() {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    // 印刷ダイアログを閉じた後に iframe を除去
+    setTimeout(function() {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 60000);
+  });
+
+  if (mode === 'pdf') {
     showToast('📄 印刷ダイアログ →「PDFとして保存」を選択してください');
   }
-  // Blob URL を2分後に解放
-  setTimeout(function() { URL.revokeObjectURL(url); }, 120000);
 }
+
+/* ══ 印刷する
+   隠し iframe 経由で印刷ダイアログを直接開く。新タブ不要。
+══════════════════════════════════════════════════════════════════════════ */
+function printSchedule() { _printViaIframe('print'); }
+
+/* ══ PDF保存
+   同じ隠し iframe 経由。印刷ダイアログで「PDFとして保存」を選択。
+   印刷・PDF保存ともに同一レイアウト・1ページ出力。
+══════════════════════════════════════════════════════════════════════════ */
+function savePdfDirect() { _printViaIframe('pdf'); }
 
 function escHtml(str) {
   return String(str)
