@@ -1,46 +1,42 @@
-/* ══════════════════════════════════════════════════
+/* ══════════════════════════════════════════
    週間スケジュール表 — Service Worker
-   キャッシュ戦略: Cache First（オフライン対応）
-══════════════════════════════════════════════════ */
+   オフライン対応・キャッシュ管理
+══════════════════════════════════════════ */
+'use strict';
 
-const CACHE_NAME    = 'schedule-pwa-v1';
-const FONT_CACHE    = 'schedule-fonts-v1';
+const CACHE_NAME = 'schedule-sw-v1';
 
-/* キャッシュ対象（アプリシェル） */
-const APP_SHELL = [
+/* キャッシュ対象ファイル */
+const ASSETS = [
+  './',
   './index.html',
   './manifest.json',
+  './icon-180.png',
   './icon-192.png',
   './icon-512.png',
+  'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap',
 ];
 
-/* Googleフォント（別キャッシュ） */
-const FONT_ORIGINS = [
-  'https://fonts.googleapis.com',
-  'https://fonts.gstatic.com',
-];
-
-/* ══ インストール：アプリシェルを事前キャッシュ ══ */
+/* ── インストール：必須ファイルをキャッシュ ── */
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(APP_SHELL);
+      /* フォントなど外部リソースは失敗しても続行 */
+      return Promise.allSettled(
+        ASSETS.map(url => cache.add(url).catch(() => { /* ignore */ }))
+      );
     }).then(function() {
       return self.skipWaiting();
     })
   );
 });
 
-/* ══ アクティベート：古いキャッシュを削除 ══ */
+/* ── アクティベート：古いキャッシュを削除 ── */
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(key) {
-          return key !== CACHE_NAME && key !== FONT_CACHE;
-        }).map(function(key) {
-          return caches.delete(key);
-        })
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
       );
     }).then(function() {
       return self.clients.claim();
@@ -48,59 +44,30 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-/* ══ フェッチ：Cache First 戦略 ══ */
+/* ── フェッチ：キャッシュ優先、なければネットワーク ── */
 self.addEventListener('fetch', function(event) {
-  /* POST など GET 以外はスルー（最初に判定） */
+  /* POST / 外部API は素通し */
   if (event.request.method !== 'GET') return;
 
-  const url = new URL(event.request.url);
+  event.respondWith(
+    caches.match(event.request).then(function(cached) {
+      if (cached) return cached;
 
-  /* Googleフォントは専用キャッシュ（Stale-While-Revalidate） */
-  if (FONT_ORIGINS.some(function(origin) { return url.origin === new URL(origin).origin; })) {
-    event.respondWith(handleFont(event.request));
-    return;
-  }
-
-  /* アプリシェル：Cache First */
-  event.respondWith(handleCacheFirst(event.request));
-});
-
-/* ── Cache First ── */
-function handleCacheFirst(request) {
-  return caches.match(request).then(function(cached) {
-    if (cached) return cached;
-
-    return fetch(request).then(function(response) {
-      /* 有効なレスポンスのみキャッシュ */
-      if (!response || response.status !== 200 || response.type === 'opaque') {
-        return response;
-      }
-      var clone = response.clone();
-      caches.open(CACHE_NAME).then(function(cache) {
-        cache.put(request, clone);
-      });
-      return response;
-    }).catch(function() {
-      /* オフライン時：index.html にフォールバック */
-      return caches.match('./index.html');
-    });
-  });
-}
-
-/* ── フォント：Stale-While-Revalidate ── */
-function handleFont(request) {
-  return caches.open(FONT_CACHE).then(function(cache) {
-    return cache.match(request).then(function(cached) {
-      var fetchPromise = fetch(request).then(function(response) {
-        /* opaque レスポンスはサイズ不明で QuotaExceeded を招くためキャッシュしない */
-        if (response && response.status === 200 && response.type !== 'opaque') {
-          cache.put(request, response.clone());
+      return fetch(event.request).then(function(response) {
+        /* エラーレスポンスはキャッシュしない */
+        if (!response || response.status !== 200 || response.type === 'error') {
+          return response;
         }
+        /* 成功したレスポンスをキャッシュに追加 */
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
         return response;
-      }).catch(function() { return cached; });
-
-      /* キャッシュがあればすぐ返し、バックグラウンドで更新 */
-      return cached || fetchPromise;
-    });
-  });
-}
+      }).catch(function() {
+        /* オフライン時は index.html へフォールバック */
+        return caches.match('./index.html');
+      });
+    })
+  );
+});
