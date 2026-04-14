@@ -294,8 +294,8 @@
   .modal-btn-print  { background: #edfaf1; color: #1a7a3a; border: 1px solid #9adcb4; }
   .modal-btn-txt    { background: #e8f2ff; color: var(--blue); }
   .modal-btn-pdf    { background: var(--accent); color: white; }
-  /* スマホでは印刷ボタンを非表示（window.open が使えないため PDF 保存に統一）*/
-  @media (hover: none) and (pointer: coarse) { .pc-only { display: none !important; } }
+  /* 印刷ボタンはすべてのデバイスで表示（window.print() 直接呼び出しのため） */
+  /* @media (hover: none) and (pointer: coarse) { .pc-only { display: none !important; } } */
 
   /* ══ プルダウン管理ページ ══ */
   .opts-slot-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -385,6 +385,7 @@
 
   /* ══ 印刷：A4横・1枚に収める ══ */
   @media print {
+    /* A4横: 297mm × 210mm、余白8mm → 印刷可能域 281mm × 194mm */
     @page { size: A4 landscape; margin: 8mm; }
 
     /* 印刷不要要素を全て非表示 */
@@ -394,51 +395,63 @@
 
     /* ページ全体リセット */
     html, body {
-      width: 100%; height: 100%;
+      width: 281mm; height: 194mm;
       margin: 0; padding: 0;
       background: white;
       font-family: 'Noto Sans JP', -apple-system, sans-serif;
       color: #1c1c1e;
+      overflow: hidden;
     }
+
+    /* 背景色を印刷に反映 */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* ページ分割を禁止 */
+    table { page-break-inside: avoid; break-inside: avoid; }
+    tbody tr { page-break-inside: avoid; break-inside: avoid; }
 
     /* 印刷テーブルを全面表示 */
     #print-view {
       display: flex !important;
       flex-direction: column;
-      /* A4横: 297mm - 余白8mm×2 = 281mm / 高さ: 210mm - 8mm×2 = 194mm */
       width: 281mm;
       height: 194mm;
       overflow: hidden;
     }
 
-    /* 利用者情報ヘッダー */
+    /* 利用者情報ヘッダー
+       高さ固定: 9mm + border 0.5mm + margin-bottom 2mm = 11.5mm 消費 */
     #print-info {
       flex-shrink: 0;
       display: flex;
-      align-items: baseline;
-      gap: 6mm;
+      align-items: center;
+      gap: 5mm;
+      height: 9mm;
       padding-bottom: 2mm;
       border-bottom: 0.5mm solid #3a3a3c;
       margin-bottom: 2mm;
-      font-size: 8pt;
+      font-size: 7.5pt;
+      overflow: hidden;
     }
     #print-info .pi-title {
-      font-size: 11pt;
+      font-size: 10pt;
       font-weight: 700;
       letter-spacing: 0.06em;
       margin-right: 2mm;
+      white-space: nowrap;
     }
-    #print-info .pi-field { color: #3a3a3c; }
+    #print-info .pi-field { color: #3a3a3c; white-space: nowrap; }
     #print-info .pi-label { font-weight: 700; margin-right: 1mm; }
 
-    /* メインテーブル */
+    /* メインテーブル
+       残り高さ: 194 - 9(ヘッダー) - 2(border+padding) - 2(margin-bottom) = 181mm
+       thead: 5.5mm / tbody 7行: (181 - 5.5 - border ~2mm) / 7 ≈ 24.8mm → 24.5mmで余裕確保 */
     #print-table {
       flex: 1;
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      /* 残り高さを均等に割り付け */
-      height: 0; /* flex: 1 に任せるためのリセット */
+      height: 0; /* flex:1 に任せる */
     }
 
     #print-table th, #print-table td {
@@ -450,24 +463,30 @@
       line-height: 1.4;
     }
 
-    /* 列幅：曜日12% / 朝昼夕夜 各22% */
-    #print-table col.col-day  { width: 12%; }
-    #print-table col.col-slot { width: 22%; }
+    /* 列幅：曜日 10% / 朝昼夕夜 各22.5% */
+    #print-table col.col-day  { width: 10%; }
+    #print-table col.col-slot { width: 22.5%; }
 
-    /* ヘッダー行 */
+    /* ヘッダー行 高さ固定 */
+    #print-table thead tr { height: 5.5mm; }
     #print-table thead th {
       font-weight: 700;
       font-size: 8pt;
       text-align: center;
-      padding: 1.5mm;
+      padding: 1mm;
       white-space: nowrap;
       background: #f2f2f7;
+      vertical-align: middle;
     }
     #print-table thead th:first-child { background: #3a3a3c; color: #fff; }
     #print-table thead th.th-morning  { color: #856404; }
     #print-table thead th.th-noon     { color: #0f5132; }
     #print-table thead th.th-evening  { color: #084298; }
     #print-table thead th.th-night    { color: #432874; }
+
+    /* データ行：高さを均等固定（7行 × 24.5mm = 171.5mm） */
+    #print-table tbody tr { height: 24.5mm; }
+    #print-table tbody td { height: 24.5mm; max-height: 24.5mm; }
 
     /* 曜日セル */
     #print-table td.td-day {
@@ -476,7 +495,7 @@
       text-align: center;
       vertical-align: middle;
       background: #f2f2f7;
-      white-space: nowrap;
+      white-space: pre;
     }
 
     /* タグチップ */
@@ -485,6 +504,8 @@
       flex-wrap: wrap;
       gap: 0.8mm;
       align-content: flex-start;
+      max-height: 22mm;
+      overflow: hidden;
     }
     #print-table .pt-tag {
       display: inline-block;
@@ -1303,364 +1324,257 @@ function openPreview() {
 
 function closePreview() { document.getElementById('preview-modal').classList.remove('open'); }
 
-/* ══ 印刷 ══ */
+/* ══════════════════════════════════════════════════════════════════════
+   印刷用 HTML 生成
+   ─ 縦軸 = 曜日（月〜日）  /  横軸 = 朝・昼・夕・夜
+   ─ @page A4 横 (297×210mm、余白 8mm → 印刷可能域 281×194mm)
+   ─ zoom プロパティで1ページに自動収束（transform は印刷エンジンに無視される）
+   ─ 外部ライブラリ不要・純粋な CSS/HTML のみ
+════════════════════════════════════════════════════════════════════════ */
 function buildPrintHtml() {
   const u = getUserInfo();
 
-  // 利用者情報
+  /* ── 利用者情報ヘッダー ── */
   let infoHtml = '';
-  [['利用者', u.name ? u.name + ' 様' : ''], ['担当者', u.staff], ['期間', u.period]]
-    .forEach(function([label, val]) {
-      if (!val) return;
-      infoHtml += '<span class="fi"><span class="fl">' + escHtml(label) + '：</span>' + escHtml(val) + '</span>';
-    });
-
-  // テーブル行
-  const rowsHtml = DAYS.map(function(day) {
-    let cells = '<td class="dc">' + escHtml(day) + '</td>';
-    SLOTS.forEach(function(slot) {
-      const tags = getTags(day, slot);
-      cells += tags.length
-        ? '<td><div class="tw">' + tags.map(t => '<span class="tc ' + slot + '">' + escHtml(t) + '</span>').join('') + '</div></td>'
-        : '<td><span class="te">─</span></td>';
-    });
-    return '<tr>' + cells + '</tr>';
-  }).join('');
-
-  // A4横 @page margin:8mm → 印刷可能領域 281mm × 194mm
-  // ヘッダー高さを固定値で確保: タイトル行(約8mm) + border(0.5mm) + margin-bottom(2mm) = 10.5mm
-  // thead 高さ: 約6mm
-  // tbody: 残り 194 - 10.5 - 6 = 177.5mm を7行で均等 ≈ 25.4mm/行
-  const HDR_H   = '10.5mm';
-  const TH_H    = '6mm';
-  const ROW_H   = '25.36mm';  // (194 - 10.5 - 6 - 7*0.3) / 7  (border込み)
-
-  return '<!DOCTYPE html><html lang="ja"><head>' +
-    '<meta charset="UTF-8">' +
-    '<link rel="preconnect" href="https://fonts.googleapis.com">' +
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">' +
-    '<style>' +
-    // ── ページ設定 ──
-    '@page{size:A4 landscape;margin:8mm}' +
-    '*{box-sizing:border-box;margin:0;padding:0}' +
-    'html,body{' +
-      'width:281mm;height:194mm;' +
-      'font-family:"Noto Sans JP",-apple-system,sans-serif;' +
-      'color:#1c1c1e;background:white;overflow:hidden;' +
-    '}' +
-    // ── ヘッダー ──
-    '#hd{' +
-      'height:' + HDR_H + ';' +
-      'display:flex;align-items:center;gap:5mm;' +
-      'border-bottom:.5mm solid #3a3a3c;margin-bottom:2mm;' +
-      'font-size:7.5pt;overflow:hidden;' +
-    '}' +
-    '.ht{font-size:10.5pt;font-weight:700;letter-spacing:.06em;white-space:nowrap;margin-right:2mm}' +
-    '.fl{font-weight:700;margin-right:.5mm}.fi{color:#3a3a3c;white-space:nowrap}' +
-    // ── テーブル ──
-    'table{width:281mm;border-collapse:collapse;table-layout:fixed}' +
-    'col.cd{width:12%}col.cs{width:22%}' +
-    // thead 行を高さ固定
-    'thead tr{height:' + TH_H + '}' +
-    'th{border:.3mm solid #aaa;font-weight:700;font-size:7.5pt;text-align:center;' +
-      'white-space:nowrap;background:#f2f2f7;vertical-align:middle;overflow:hidden}' +
-    'thead th:first-child{background:#3a3a3c;color:#fff}' +
-    '.hm{color:#856404}.hn{color:#0f5132}.he{color:#084298}.hni{color:#432874}' +
-    // tbody セル
-    'tbody tr{height:' + ROW_H + '}' +
-    'td{border:.3mm solid #aaa;padding:1mm 1.5mm;vertical-align:top;' +
-      'overflow:hidden;font-size:7pt;line-height:1.35;height:' + ROW_H + '}' +
-    'td.dc{font-weight:700;font-size:8pt;text-align:center;vertical-align:middle;' +
-      'background:#f2f2f7;white-space:nowrap}' +
-    '.tw{display:flex;flex-wrap:wrap;gap:.5mm;align-content:flex-start;max-height:100%}' +
-    '.tc{display:inline-block;font-size:6.5pt;font-weight:500;' +
-      'padding:.3mm 1.5mm;border-radius:2px;white-space:nowrap;line-height:1.4}' +
-    '.tc.morning{background:#fff3cd;color:#856404}' +
-    '.tc.noon{background:#d1e7dd;color:#0f5132}' +
-    '.tc.evening{background:#cfe2ff;color:#084298}' +
-    '.tc.night{background:#e2d9f3;color:#432874}' +
-    '.te{color:#aaa;font-size:7pt}' +
-    // 印刷色補正
-    '@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-      // ページ分割を絶対に起こさない
-      'table{page-break-inside:avoid;break-inside:avoid}' +
-      'tbody tr{page-break-inside:avoid;break-inside:avoid}' +
-    '}' +
-    '</style></head><body>' +
-    '<div id="hd"><span class="ht">週間スケジュール表</span>' + infoHtml + '</div>' +
-    '<table>' +
-    '<colgroup><col class="cd"><col class="cs"><col class="cs"><col class="cs"><col class="cs"></colgroup>' +
-    '<thead><tr>' +
-      '<th>曜日</th>' +
-      '<th class="hm">🌅 朝</th>' +
-      '<th class="hn">☀️ 昼</th>' +
-      '<th class="he">🌇 夕</th>' +
-      '<th class="hni">🌙 夜</th>' +
-    '</tr></thead>' +
-    '<tbody>' + rowsHtml + '</tbody>' +
-    '</table>' +
-    // JS は不要：mm単位の固定レイアウトのみで1ページに収める
-    '</body></html>';
-}
-
-function printSchedule() {
-  closePreview();
-
-  const win = window.open('', '_blank', 'width=1200,height=900');
-  if (!win) {
-    showToast('⚠️ ポップアップを許可してください');
-    return;
-  }
-  win.document.open();
-  // フォント読み込み完了後に印刷するスクリプトを末尾に挿入
-  const html = buildPrintHtml().replace('</body></html>',
-    '<script>document.fonts.ready.then(function(){' +
-      'window.print();' +
-      'setTimeout(function(){window.close();},800);' +
-    '});<\/script></body></html>');
-  win.document.write(html);
-  win.document.close();
-}
-
-/* ══ PDF直接保存 ══ */
-function savePdfDirect() {
-  closePreview();
-  showToast('📄 PDF生成中…');
-
-  // ── ライブラリ読み込み（ロード完了を onload で保証。二重ロード防止） ──
-  // スコープ外の単一定義（savePdfDirect 内で重複定義しない）
-  _pdfLoadScript(
-    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-    function() {
-      _pdfLoadScript(
-        'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-        _pdfGenerate
-      );
-    }
-  );
-}
-
-// ── スクリプトロードユーティリティ（グローバルに1つだけ定義）──
-function _pdfLoadScript(src, cb) {
-  // すでにロード完了していれば即コールバック
-  const alreadyLoaded = src.indexOf('html2canvas') !== -1
-    ? typeof html2canvas !== 'undefined'
-    : (typeof window.jspdf !== 'undefined' || typeof window.jsPDF !== 'undefined');
-  if (alreadyLoaded) { cb(); return; }
-
-  // ロード中タグがあれば onload を後付け
-  const existing = document.querySelector('script[src="' + src + '"]');
-  if (existing) {
-    existing.addEventListener('load', cb);
-    return;
-  }
-
-  // 新規ロード
-  const s = document.createElement('script');
-  s.src = src;
-  s.onload = cb;
-  s.onerror = function() { showToast('⚠️ ライブラリの読み込みに失敗しました'); };
-  document.head.appendChild(s);
-}
-
-// ── PDF生成本体 ──
-function _pdfGenerate() {
-  const u = getUserInfo();
-  let filename = '週間スケジュール表';
-  if (u.name)   filename = u.name + '_' + filename;
-  if (u.period) filename = filename + '_' + u.period;
-  filename += '.pdf';
-
-  // 利用者情報HTML（escHtml でXSS対策済み）
-  let infoHtml = '';
-  [['利用者', u.name ? u.name + ' 様' : ''], ['担当者', u.staff], ['期間', u.period]]
-    .forEach(function([label, val]) {
-      if (!val) return;
-      infoHtml += '<span class="fi"><span class="fl">' + escHtml(label) + '：</span>' + escHtml(val) + '</span>';
-    });
-
-  // テーブル行HTML
-  const rowsHtml = DAYS.map(function(day) {
-    let cells = '<td class="dc">' + escHtml(day) + '</td>';
-    SLOTS.forEach(function(slot) {
-      const tags = getTags(day, slot);
-      cells += tags.length
-        ? '<td><div class="tw">' + tags.map(t => '<span class="tc ' + slot + '">' + escHtml(t) + '</span>').join('') + '</div></td>'
-        : '<td><span class="te">─</span></td>';
-    });
-    return '<tr>' + cells + '</tr>';
-  }).join('');
-
-  // ── キャプチャ用コンテナを画面内に配置（html2canvas はオフスクリーン要素を描画不可）──
-  // 黒幕オーバーレイでユーザーから隠す
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:#1c1c1e;z-index:9998;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = '<div style="color:#fff;font-family:-apple-system,sans-serif;font-size:14px;font-weight:600;">📄 PDF生成中…</div>';
-
-  // A4横(10mm余白)の印刷可能領域
-  const PDF_W_MM = 277;
-  const PDF_H_MM = 190;
-
-  // 固定960px幅でレンダリング。ただしビューポートが960px未満の場合は
-  // コンテナが画面外にはみ出してキャプチャが切れるため、実ビューポート幅に合わせる
-  const W = Math.min(960, window.innerWidth);
-  const H = Math.round(W * PDF_H_MM / PDF_W_MM);  // アスペクト比を保持
-
-  const container = document.createElement('div');
-  container.id = '__pdf_render__';
-  container.style.cssText = [
-    'position:fixed', 'left:0', 'top:0',
-    'width:'  + W + 'px',
-    'height:' + H + 'px',
-    'overflow:hidden', 'background:#fff',
-    'z-index:9999',
-    'font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",-apple-system,sans-serif',
-    'color:#1c1c1e', 'display:flex', 'flex-direction:column',
-  ].join(';');
-
-  // フォントサイズ（W=960px基準の固定値）
-  const fs  = '10';   // 基本フォント px
-  const fsH = '14';   // タイトル px
-  const fsT = '9';    // セル px
-  const fsS = '8';    // タグ px
-  const pad1 = '3';   // ヘッダー padding px
-  const pad2 = '6';   // ヘッダー margin-bottom px
-  const bdPad = '2';  // セル padding px
-  const thPad = '3';  // thead padding px
-  const tcPad = '4';  // タグ horizontal padding px
-
-  container.innerHTML =
-    '<style>' +
-    '#__pdf_render__ *{box-sizing:border-box;margin:0;padding:0}' +
-    '#__pdf_render__ #phd{display:flex;align-items:baseline;gap:12px;padding-bottom:' + pad1 + 'px;' +
-      'border-bottom:1.5px solid #3a3a3c;margin-bottom:' + pad2 + 'px;font-size:' + fs + 'px;flex-shrink:0}' +
-    '#__pdf_render__ .ht{font-size:' + fsH + 'px;font-weight:700;letter-spacing:.06em;margin-right:6px}' +
-    '#__pdf_render__ .fl{font-weight:700;margin-right:2px}' +
-    '#__pdf_render__ .fi{color:#3a3a3c}' +
-    '#__pdf_render__ table{width:100%;border-collapse:collapse;table-layout:fixed;flex:1;min-height:0}' +
-    '#__pdf_render__ col.cd{width:12%}#__pdf_render__ col.cs{width:22%}' +
-    '#__pdf_render__ th,#__pdf_render__ td{border:0.5px solid #aaa;padding:' + bdPad + 'px ' + bdPad + 'px;' +
-      'vertical-align:top;overflow:hidden;font-size:' + fsT + 'px;line-height:1.4}' +
-    '#__pdf_render__ thead th{font-weight:700;font-size:' + fs + 'px;text-align:center;padding:' + thPad + 'px;' +
-      'white-space:nowrap;background:#f2f2f7}' +
-    '#__pdf_render__ thead th:first-child{background:#3a3a3c;color:#fff}' +
-    '#__pdf_render__ .hm{color:#856404}#__pdf_render__ .hn{color:#0f5132}' +
-    '#__pdf_render__ .he{color:#084298}#__pdf_render__ .hni{color:#432874}' +
-    '#__pdf_render__ td.dc{font-weight:700;font-size:' + fs + 'px;text-align:center;' +
-      'vertical-align:middle;background:#f2f2f7;white-space:nowrap}' +
-    '#__pdf_render__ .tw{display:flex;flex-wrap:wrap;gap:1px;align-content:flex-start}' +
-    '#__pdf_render__ .tc{display:inline-block;font-size:' + fsS + 'px;font-weight:500;' +
-      'padding:1px ' + tcPad + 'px;border-radius:2px;white-space:nowrap;line-height:1.5}' +
-    '#__pdf_render__ .tc.morning{background:#fff3cd;color:#856404}' +
-    '#__pdf_render__ .tc.noon{background:#d1e7dd;color:#0f5132}' +
-    '#__pdf_render__ .tc.evening{background:#cfe2ff;color:#084298}' +
-    '#__pdf_render__ .tc.night{background:#e2d9f3;color:#432874}' +
-    '#__pdf_render__ .te{color:#aaa;font-size:' + fsS + 'px}' +
-    '</style>' +
-    '<div id="phd"><span class="ht">週間スケジュール表</span>' + infoHtml + '</div>' +
-    '<table><colgroup>' +
-      '<col class="cd"><col class="cs"><col class="cs"><col class="cs"><col class="cs">' +
-    '</colgroup><thead><tr>' +
-      '<th>曜日</th><th class="hm">🌅 朝</th><th class="hn">☀️ 昼</th>' +
-      '<th class="he">🌇 夕</th><th class="hni">🌙 夜</th>' +
-    '</tr></thead><tbody id="__pdf_tbody__">' + rowsHtml + '</tbody></table>';
-
-  // フェイルセーフ：10秒後に強制クリーンアップ
-  let cleanedUp = false;
-  function cleanup() {
-    if (cleanedUp) return;
-    cleanedUp = true;
-    if (document.body.contains(overlay))   document.body.removeChild(overlay);
-    if (document.body.contains(container)) document.body.removeChild(container);
-  }
-  const failsafeTimer = setTimeout(function() {
-    if (!cleanedUp) { cleanup(); showToast('⚠️ PDF生成がタイムアウトしました'); }
-  }, 10000);
-
-  document.body.appendChild(overlay);
-  document.body.appendChild(container);
-
-  // rAF を2回挟んでレイアウト確定を保証してからキャプチャ
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      try {
-        // 行高を実測値ベースで均等自動調整
-        const hd     = container.querySelector('#phd');
-        const thead  = container.querySelector('thead');
-        const rows   = Array.from(container.querySelectorAll('#__pdf_tbody__ tr'));
-        const hdRect = hd     ? hd.getBoundingClientRect()    : { height: 0 };
-        const thRect = thead  ? thead.getBoundingClientRect() : { height: 0 };
-        // margin-bottom の実測値も加算
-        const hdMargin = hd ? parseFloat(getComputedStyle(hd).marginBottom) || 0 : 0;
-        const usedH  = hdRect.height + hdMargin + thRect.height;
-        const rowH   = Math.max(16, Math.floor((H - usedH) / Math.max(rows.length, 1)));
-
-        rows.forEach(function(r) {
-          r.style.height = rowH + 'px';
-          r.style.maxHeight = rowH + 'px';
-          Array.from(r.querySelectorAll('td')).forEach(function(td) {
-            td.style.height = rowH + 'px';
-            td.style.maxHeight = rowH + 'px';
-          });
-        });
-      } catch (e) {
-        console.warn('row height adjustment failed:', e);
-      }
-
-      // もう1フレーム待ってから html2canvas でキャプチャ
-      requestAnimationFrame(function() {
-        html2canvas(container, {
-          scale: 2,           // Retina 対応
-          useCORS: true,
-          logging: false,
-          width:  W,
-          height: H,
-          backgroundColor: '#ffffff',
-          // windowWidth/Height をコンテナの CSS px サイズに固定
-          // （ブラウザのビューポート幅に依存しないようにする）
-          windowWidth:  W,
-          windowHeight: H,
-          x: 0, y: 0,
-          scrollX: -container.getBoundingClientRect().left,
-          scrollY: -container.getBoundingClientRect().top,
-        }).then(function(canvas) {
-          clearTimeout(failsafeTimer);
-          cleanup();
-
-          // canvas の実寸 → mm 変換して jsPDF に正確に配置
-          // canvas は scale:2 なので CSS px = canvas.width / 2
-          const cssPxW = canvas.width  / 2;
-          const cssPxH = canvas.height / 2;
-          // 1 CSS px = PDF_W_MM / W mm
-          const imgW_mm = cssPxW * (PDF_W_MM / W);
-          const imgH_mm = cssPxH * (PDF_H_MM / H);
-
-          const imgData  = canvas.toDataURL('image/jpeg', 0.95);
-          const jsPDFCls = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-          const pdf = new jsPDFCls({ unit: 'mm', format: 'a4', orientation: 'landscape' });
-          pdf.addImage(imgData, 'JPEG', 10, 10, imgW_mm, imgH_mm);
-
-          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-          if (isIOS) {
-            const a = document.createElement('a');
-            a.href = pdf.output('datauristring');
-            a.target = '_blank'; a.rel = 'noopener';
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          } else {
-            pdf.save(filename);
-          }
-          showToast('💾 PDFを保存しました');
-        }).catch(function(err) {
-          clearTimeout(failsafeTimer);
-          cleanup();
-          console.error('html2canvas error:', err);
-          showToast('⚠️ PDF生成に失敗しました');
-        });
-      });
-    });
+  [
+    ['利用者', u.name ? u.name + '\u00a0様' : ''],
+    ['担当者', u.staff],
+    ['期間',   u.period],
+  ].forEach(function(pair) {
+    if (!pair[1]) return;
+    infoHtml +=
+      '<span class="fi">'
+      + '<span class="fl">' + escHtml(pair[0]) + '：</span>'
+      + escHtml(pair[1])
+      + '</span>';
   });
+
+  /* ── テーブル行（縦=曜日、横=朝昼夕夜）── */
+  const rowsHtml = DAYS.map(function(day) {
+    const dayShort = escHtml(day.replace('曜日', ''));
+    let cells = '<td class="dc">' + dayShort + '<br><small>曜日</small></td>';
+    SLOTS.forEach(function(slot) {
+      const tags = getTags(day, slot);
+      cells += tags.length
+        ? '<td><div class="tw">'
+            + tags.map(function(t) {
+                return '<span class="tc ' + slot + '">' + escHtml(t) + '</span>';
+              }).join('')
+            + '</div></td>'
+        : '<td><span class="te">─</span></td>';
+    });
+    return '<tr>' + cells + '</tr>';
+  }).join('');
+
+  /*
+   * CSS 設計方針:
+   * ─ body / #wrap に幅のみ固定。高さは固定しない（自然高で計測するため）
+   * ─ zoom をJSで後から注入するため、ここでは zoom:1 のプレースホルダを置く
+   * ─ overflow-wrap:anywhere で長い日本語テキストを適切に折り返す
+   * ─ word-break:break-all は使わない（日本語テキストを不自然に分断する）
+   */
+  const css = [
+    '@page{size:A4 landscape;margin:8mm}',
+    '*{box-sizing:border-box;margin:0;padding:0;',
+    ' -webkit-print-color-adjust:exact;print-color-adjust:exact}',
+    'html{background:#fff}',
+    /* zoom はJSで注入。幅のみ固定して高さは自然に流す */
+    'body{width:281mm;margin:0;padding:0;background:#fff;',
+    ' font-family:"Noto Sans JP",-apple-system,sans-serif;',
+    ' color:#1c1c1e;zoom:1}',              /* ← JS が zoom 値を上書き */
+    '#wrap{width:281mm}',
+
+    /* 利用者情報ヘッダー: 幅全体・自然高 */
+    '#hd{display:flex;align-items:center;flex-wrap:wrap;',
+    ' gap:1mm 5mm;padding-bottom:1.5mm;',
+    ' border-bottom:.4mm solid #3a3a3c;margin-bottom:2mm;font-size:7.5pt}',
+    '.ht{font-size:10pt;font-weight:700;letter-spacing:.05em;',
+    ' white-space:nowrap;margin-right:3mm}',
+    '.fl{font-weight:700;margin-right:.3mm}',
+    '.fi{color:#3a3a3c;white-space:nowrap;margin-right:3mm}',
+
+    /* テーブル: 幅100%・table-layout:fixed で列幅を制御 */
+    'table{width:100%;border-collapse:collapse;table-layout:fixed}',
+    /* 曜日列 10mm / 時間帯列 = (281-10)/4 ≈ 67.75mm */
+    'col.cd{width:10mm}col.cs{width:67.75mm}',
+
+    /* ヘッダー行 */
+    'th{border:.3mm solid #999;font-weight:700;font-size:8pt;',
+    ' text-align:center;padding:1.5mm 1mm;white-space:nowrap;',
+    ' background:#f0f0f5;vertical-align:middle}',
+    'thead th:first-child{background:#3a3a3c;color:#fff}',
+    '.hm{color:#856404}.hn{color:#0f5132}.he{color:#084298}.hni{color:#432874}',
+
+    /* データ行: 高さ固定なし。zoom で全体を縮小して1ページに収める */
+    'td{border:.3mm solid #bbb;padding:1.5mm 1.5mm;',
+    ' vertical-align:top;font-size:7pt;line-height:1.5;',
+    ' overflow-wrap:anywhere}',            /* ← break-all の代わり */
+    'td.dc{font-weight:700;font-size:9pt;text-align:center;',
+    ' vertical-align:middle;background:#f0f0f5;white-space:nowrap;line-height:1.3}',
+    'td.dc small{display:block;font-size:6pt;font-weight:400;',
+    ' color:#555;line-height:1.2;margin-top:.5mm}',
+
+    /* タグチップ */
+    '.tw{display:flex;flex-wrap:wrap;gap:1mm;align-content:flex-start}',
+    '.tc{display:inline-block;font-size:6.5pt;font-weight:500;',
+    ' padding:.5mm 2mm;border-radius:3px;white-space:nowrap;line-height:1.5}',
+    '.tc.morning{background:#fff3cd;color:#856404}',
+    '.tc.noon   {background:#d1e7dd;color:#0f5132}',
+    '.tc.evening{background:#cfe2ff;color:#084298}',
+    '.tc.night  {background:#e2d9f3;color:#432874}',
+    '.te{color:#bbb;font-size:6.5pt}',
+
+    /* 印刷時ページ分割禁止 */
+    '@media print{table,tbody tr{page-break-inside:avoid;break-inside:avoid}}',
+  ].join('');
+
+  return [
+    '<!DOCTYPE html><html lang="ja">',
+    '<head>',
+    '<meta charset="UTF-8">',
+    '<link rel="preconnect" href="https://fonts.googleapis.com">',
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+    '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">',
+    '<style>', css, '</style>',
+    '</head>',
+    '<body>',
+    '<div id="wrap">',
+      '<div id="hd">',
+        '<span class="ht">週間スケジュール表</span>',
+        infoHtml,
+      '</div>',
+      '<table>',
+        '<colgroup>',
+          '<col class="cd">',
+          '<col class="cs"><col class="cs"><col class="cs"><col class="cs">',
+        '</colgroup>',
+        '<thead><tr>',
+          '<th>曜日</th>',
+          '<th class="hm">🌅&nbsp;朝</th>',
+          '<th class="hn">☀️&nbsp;昼</th>',
+          '<th class="he">🌇&nbsp;夕</th>',
+          '<th class="hni">🌙&nbsp;夜</th>',
+        '</tr></thead>',
+        '<tbody>', rowsHtml, '</tbody>',
+      '</table>',
+    '</div>',
+    '</body></html>',
+  ].join('');
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   印刷ズーム適用
+   ─ transform:scale() は印刷エンジンに無視されるため使用しない
+   ─ zoom プロパティを body に設定する（Chrome/Edge/Safari の印刷エンジンが尊重）
+   ─ 自然高さを計測 → A4横印刷可能域(281×194mm)に収まるズーム値を算出
+════════════════════════════════════════════════════════════════════════ */
+function _applyPrintZoom(idoc) {
+  const body = idoc.body;
+  const wrap = idoc.getElementById('wrap');
+  if (!body || !wrap) return;
+
+  /* iframe 内で mm→px 変換係数を実測（DPIに依存しない正確な方法） */
+  const probe = idoc.createElement('div');
+  probe.style.cssText =
+    'position:absolute;top:-9999px;left:0;' +
+    'width:100mm;height:1px;visibility:hidden;zoom:1';
+  body.appendChild(probe);
+  const pxPer100mm = probe.offsetWidth;
+  body.removeChild(probe);
+
+  /* offsetWidth が 0 になる場合のフォールバック（96dpi 相当） */
+  const MM_TO_PX = pxPer100mm > 0 ? pxPer100mm / 100 : 96 / 25.4;
+
+  const PAGE_W = 281 * MM_TO_PX; /* A4横 印刷可能域 幅 px */
+  const PAGE_H = 194 * MM_TO_PX; /* A4横 印刷可能域 高さ px */
+
+  /* zoom:1 の状態で自然サイズを計測 */
+  body.style.zoom = '1';
+  const natW = wrap.scrollWidth;
+  const natH = wrap.scrollHeight;
+
+  /* 幅・高さの両方に収まる最小倍率（拡大はしない） */
+  const zoom = Math.min(PAGE_W / natW, PAGE_H / natH, 1.0);
+
+  if (zoom < 0.9999) {
+    body.style.zoom = zoom.toFixed(6);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   隠し iframe による直接印刷
+   ─ 新タブ・ダウンロード不要
+   ─ iframe を A4横の物理サイズ (297×210mm) で生成
+     → iframe 内の CSS mm 単位が正確に計算される
+   ─ フォント確実読み込み → zoom 自動計算 → print() の順で実行
+════════════════════════════════════════════════════════════════════════ */
+function _printViaIframe(mode) {
+  closePreview();
+
+  /* 既存の印刷 iframe を除去 */
+  const old = document.getElementById('_print_iframe');
+  if (old) old.parentNode.removeChild(old);
+
+  /* A4横の物理サイズで iframe を生成（画面外に配置して視覚的に非表示） */
+  const iframe = document.createElement('iframe');
+  iframe.id = '_print_iframe';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText =
+    'position:fixed;top:0;left:-9999px;' +
+    'width:297mm;height:210mm;' +   /* A4横 物理サイズ必須 */
+    'border:none;visibility:hidden;pointer-events:none;z-index:-1000';
+  document.body.appendChild(iframe);
+
+  const idoc = iframe.contentDocument;
+  idoc.open();
+  idoc.write(buildPrintHtml());
+  idoc.close();
+
+  /*
+   * フォント待機: fonts.ready だけでは webfont の描画完了が保証されないため
+   * 使用ウェイトを明示的にロードして Promise.all で待機する。
+   */
+  const fontLoads = [
+    idoc.fonts.ready,
+    idoc.fonts.load('400 10px "Noto Sans JP"').catch(function() {}),
+    idoc.fonts.load('700 10px "Noto Sans JP"').catch(function() {}),
+  ];
+
+  Promise.all(fontLoads).then(function() {
+    /* zoom でスケーリング適用（レイアウト確定後） */
+    _applyPrintZoom(idoc);
+
+    /*
+     * 150ms 待機: zoom 適用後の再レイアウトが印刷エンジンに
+     * 確実に反映されるのを待つ。
+     */
+    setTimeout(function() {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+
+      /* 60秒後に iframe を自動除去 */
+      setTimeout(function() {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }, 60000);
+    }, 150);
+
+  }).catch(function(err) {
+    console.warn('print: font load failed, proceeding anyway', err);
+    _applyPrintZoom(idoc);
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  });
+
+  if (mode === 'pdf') {
+    showToast('📄 印刷ダイアログ →「PDFとして保存」を選択してください');
+  }
+}
+
+/* ══ 印刷する ══ */
+function printSchedule() { _printViaIframe('print'); }
+
+/* ══ PDF保存 ══ */
+function savePdfDirect()  { _printViaIframe('pdf'); }
 
 function escHtml(str) {
   return String(str)

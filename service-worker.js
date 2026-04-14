@@ -1,73 +1,81 @@
-/* ══════════════════════════════════════════
-   週間スケジュール表 — Service Worker
-   オフライン対応・キャッシュ管理
-══════════════════════════════════════════ */
+/**
+ * service-worker.js  —  週間スケジュール表 PWA
+ *
+ * キャッシュ戦略
+ *   アプリシェル           → Cache First
+ *   Google Fonts CSS       → Network First（失敗時 Cache）
+ *   Google Fonts フォント  → Cache First（長期保持）
+ *   その他 GET             → Network First（失敗時 Cache）
+ */
+
 'use strict';
 
-const CACHE_NAME = 'schedule-sw-v1';
+const CACHE_VER  = 'v2';
+const CACHE_NAME = 'schedule-' + CACHE_VER;
 
-/* キャッシュ対象ファイル */
-const ASSETS = [
+const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
-  './icon-180.png',
-  './icon-192.png',
-  './icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap',
 ];
 
-/* ── インストール：必須ファイルをキャッシュ ── */
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      /* フォントなど外部リソースは失敗しても続行 */
-      return Promise.allSettled(
-        ASSETS.map(url => cache.add(url).catch(() => { /* ignore */ }))
-      );
-    }).then(function() {
-      return self.skipWaiting();
-    })
+/* ── install ── */
+self.addEventListener('install', function(e) {
+  e.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(function(c) { return c.addAll(APP_SHELL); })
+      .then(function()  { return self.skipWaiting(); })
   );
 });
 
-/* ── アクティベート：古いキャッシュを削除 ── */
-self.addEventListener('activate', function(event) {
-  event.waitUntil(
+/* ── activate ── */
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        keys
+          .filter(function(k) { return k !== CACHE_NAME; })
+          .map(function(k)    { return caches.delete(k); })
       );
-    }).then(function() {
-      return self.clients.claim();
-    })
+    }).then(function() { return self.clients.claim(); })
   );
 });
 
-/* ── フェッチ：キャッシュ優先、なければネットワーク ── */
-self.addEventListener('fetch', function(event) {
-  /* POST / 外部API は素通し */
-  if (event.request.method !== 'GET') return;
+/* ── fetch ── */
+self.addEventListener('fetch', function(e) {
+  if (e.request.method !== 'GET') return;
 
-  event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) return cached;
+  const url = e.request.url;
 
-      return fetch(event.request).then(function(response) {
-        /* エラーレスポンスはキャッシュしない */
-        if (!response || response.status !== 200 || response.type === 'error') {
-          return response;
-        }
-        /* 成功したレスポンスをキャッシュに追加 */
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
-        });
-        return response;
-      }).catch(function() {
-        /* オフライン時は index.html へフォールバック */
-        return caches.match('./index.html');
-      });
-    })
-  );
+  if (url.includes('fonts.googleapis.com')) {
+    e.respondWith(networkFirst(e.request)); return;
+  }
+  if (url.includes('fonts.gstatic.com')) {
+    e.respondWith(cacheFirst(e.request)); return;
+  }
+
+  const isShell = APP_SHELL.some(function(p) {
+    return url.endsWith(p.replace('./', ''));
+  });
+  e.respondWith(isShell ? cacheFirst(e.request) : networkFirst(e.request));
 });
+
+/* ── helpers ── */
+function cacheFirst(req) {
+  return caches.match(req).then(function(hit) {
+    return hit || fetchAndPut(req);
+  });
+}
+
+function networkFirst(req) {
+  return fetchAndPut(req).catch(function() { return caches.match(req); });
+}
+
+function fetchAndPut(req) {
+  return fetch(req).then(function(res) {
+    if (res.ok) {
+      caches.open(CACHE_NAME).then(function(c) { c.put(req, res.clone()); });
+    }
+    return res;
+  });
+}
