@@ -383,9 +383,9 @@
   /* ══ 印刷専用テーブル（画面では非表示）══ */
   #print-view { display: none; }
 
-  /* ══ 印刷：A4横・1枚に収める ══ */
+  /* ══ 印刷：A4横・1枚に自動収縮 ══ */
   @media print {
-    /* A4横: 297mm × 210mm、余白8mm → 印刷可能域 281mm × 194mm */
+    /* A4横: 297mm × 210mm、余白8mm */
     @page { size: A4 landscape; margin: 8mm; }
 
     /* 印刷不要要素を全て非表示 */
@@ -393,34 +393,35 @@
     #page-history, #page-options,
     .modal-overlay, .confirm-overlay, .edit-overlay { display: none !important; }
 
+    /* 背景色を印刷に反映 */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
     /* ページ全体リセット */
     html, body {
-      width: 281mm; height: 194mm;
       margin: 0; padding: 0;
       background: white;
       font-family: 'Noto Sans JP', -apple-system, sans-serif;
       color: #1c1c1e;
       overflow: hidden;
+      width: 100%; height: 100%;
     }
-
-    /* 背景色を印刷に反映 */
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
     /* ページ分割を禁止 */
     table { page-break-inside: avoid; break-inside: avoid; }
     tbody tr { page-break-inside: avoid; break-inside: avoid; }
 
-    /* 印刷テーブルを全面表示 */
+    /* 印刷テーブルを全面表示・1ページに自動スケール */
     #print-view {
       display: flex !important;
       flex-direction: column;
       width: 281mm;
       height: 194mm;
       overflow: hidden;
+      transform-origin: top left;
+      /* JS で動的にスケール設定（印刷時に1ページへ自動縮小） */
     }
 
-    /* 利用者情報ヘッダー
-       高さ固定: 9mm + border 0.5mm + margin-bottom 2mm = 11.5mm 消費 */
+    /* 利用者情報ヘッダー */
     #print-info {
       flex-shrink: 0;
       display: flex;
@@ -443,9 +444,7 @@
     #print-info .pi-field { color: #3a3a3c; white-space: nowrap; }
     #print-info .pi-label { font-weight: 700; margin-right: 1mm; }
 
-    /* メインテーブル
-       残り高さ: 194 - 9(ヘッダー) - 2(border+padding) - 2(margin-bottom) = 181mm
-       thead: 5.5mm / tbody 7行: (181 - 5.5 - border ~2mm) / 7 ≈ 24.8mm → 24.5mmで余裕確保 */
+    /* メインテーブル：縦軸＝曜日（月〜日）、横軸＝朝・昼・夕・夜 */
     #print-table {
       flex: 1;
       width: 100%;
@@ -463,11 +462,11 @@
       line-height: 1.4;
     }
 
-    /* 列幅：曜日 10% / 朝昼夕夜 各22.5% */
+    /* 列幅：曜日列 10% / 朝昼夕夜 各22.5% */
     #print-table col.col-day  { width: 10%; }
     #print-table col.col-slot { width: 22.5%; }
 
-    /* ヘッダー行 高さ固定 */
+    /* ヘッダー行（横軸：朝・昼・夕・夜） */
     #print-table thead tr { height: 5.5mm; }
     #print-table thead th {
       font-weight: 700;
@@ -484,11 +483,11 @@
     #print-table thead th.th-evening  { color: #084298; }
     #print-table thead th.th-night    { color: #432874; }
 
-    /* データ行：高さを均等固定（7行 × 24.5mm = 171.5mm） */
+    /* データ行（縦軸：月〜日、7行均等） */
     #print-table tbody tr { height: 24.5mm; }
     #print-table tbody td { height: 24.5mm; max-height: 24.5mm; }
 
-    /* 曜日セル */
+    /* 曜日セル（縦軸ラベル） */
     #print-table td.td-day {
       font-weight: 700;
       font-size: 8.5pt;
@@ -1358,10 +1357,10 @@ function buildPrintHtml() {
 
   // ── 寸法計算 ──
   // A4横 297×210mm、余白8mm → 印刷可能域 281×194mm
-  // ヘッダー: 9mm + margin 2mm = 11mm
+  // ヘッダー: 9mm + border+margin 2mm = 11mm
   // thead: 5.5mm / border合計: ~2mm
-  // tbody: (194 - 11 - 5.5 - 2) / 7 ≈ 25.1mm → 24.5mm（余裕確保）
-  const ROW_H = '24.5mm';
+  // tbody: (194 - 11 - 5.5 - 2) / 7 ≈ 25mm → 各行均等（flex:1で自動）
+  // 縦軸＝曜日（月〜日）、横軸＝朝・昼・夕・夜
 
   return [
     '<!DOCTYPE html><html lang="ja">',
@@ -1372,18 +1371,19 @@ function buildPrintHtml() {
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
     '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">',
     '<style>',
-    /* ページ設定 */
+    /* ページ設定：A4横、余白8mm */
     '@page{size:A4 landscape;margin:8mm}',
     '*{box-sizing:border-box;margin:0;padding:0;',
     ' -webkit-print-color-adjust:exact;print-color-adjust:exact}',
-    /* html はサイズ指定のみ。flex は body に集約 */
-    'html{width:281mm;height:194mm;overflow:hidden}',
-    'body{',
+    /* wrapper: A4印刷可能域に固定し、1ページに自動スケール */
+    '#wrap{',
     ' width:281mm;height:194mm;overflow:hidden;',
+    ' display:flex;flex-direction:column;',
     ' font-family:"Noto Sans JP",-apple-system,sans-serif;',
     ' color:#1c1c1e;background:#fff;',
-    ' display:flex;flex-direction:column;',
+    ' transform-origin:top left;',
     '}',
+    'html,body{margin:0;padding:0;background:#fff;width:100%;height:100%;overflow:hidden}',
     /* ヘッダー: 9mm固定 + margin-bottom 2mm */
     '#hd{',
     ' flex-shrink:0;height:9mm;',
@@ -1395,13 +1395,14 @@ function buildPrintHtml() {
     '    white-space:nowrap;margin-right:2mm}',
     '.fl{font-weight:700;margin-right:.5mm}',
     '.fi{color:#3a3a3c;white-space:nowrap}',
-    /* テーブル: flex:1 で残高さを充填 */
+    /* テーブル: 縦軸＝曜日（月〜日）、横軸＝朝昼夕夜 */
     'table{',
     ' flex:1;min-height:0;',
     ' width:100%;border-collapse:collapse;table-layout:fixed;',
+    ' height:0;',/* flex:1 に任せる */
     '}',
     'col.cd{width:10%}col.cs{width:22.5%}',
-    /* thead */
+    /* 横軸ヘッダー（朝・昼・夕・夜） */
     'thead tr{height:5.5mm}',
     'th{border:.3mm solid #aaa;font-weight:700;font-size:8pt;',
     '  text-align:center;padding:1mm;white-space:nowrap;',
@@ -1409,18 +1410,18 @@ function buildPrintHtml() {
     'thead th:first-child{background:#3a3a3c;color:#fff}',
     '.hm{color:#856404}.hn{color:#0f5132}',
     '.he{color:#084298}.hni{color:#432874}',
-    /* tbody */
-    'tbody tr{height:' + ROW_H + '}',
+    /* 縦軸データ行（月〜日 7行、均等高さ） */
+    'tbody{display:table-row-group}',
     'td{border:.3mm solid #aaa;padding:1mm 1.5mm;',
     '  vertical-align:top;overflow:hidden;',
     '  font-size:7pt;line-height:1.35;}',
     'td.dc{font-weight:700;font-size:8pt;',
     '      text-align:center;vertical-align:middle;',
     '      background:#f2f2f7;white-space:pre}',
-    /* タグ */
+    /* タグチップ */
     '.tw{display:flex;flex-wrap:wrap;gap:.5mm;',
-    '    align-content:flex-start;',
-    '    max-height:23mm;overflow:hidden}',
+    '    align-content:flex-start;overflow:hidden;',
+    '    height:100%;max-height:100%}',
     '.tc{display:inline-block;font-size:6.5pt;font-weight:500;',
     '    padding:.3mm 1.5mm;border-radius:2px;',
     '    white-space:nowrap;line-height:1.4}',
@@ -1429,14 +1430,31 @@ function buildPrintHtml() {
     '.tc.evening{background:#cfe2ff;color:#084298}',
     '.tc.night  {background:#e2d9f3;color:#432874}',
     '.te{color:#aaa;font-size:7pt}',
-    /* 印刷時：ページ分割を禁止 */
+    /* 印刷：ページ分割禁止・1ページ自動スケール */
     '@media print{',
     ' table{page-break-inside:avoid;break-inside:avoid}',
     ' tbody tr{page-break-inside:avoid;break-inside:avoid}',
+    ' html,body{width:297mm;height:210mm}',
+    ' #wrap{',
+    '   position:absolute;top:0;left:0;',
+    '   transform-origin:top left;',
+    ' }',
     '}',
     '</style>',
+    '<script>',
+    /* 1ページ自動スケール：コンテンツを印刷可能域(281×194mm)に収める */
+    'window.addEventListener("load",function(){',
+    ' var wrap=document.getElementById("wrap");',
+    ' var mmToPx=function(mm){return mm*(96/25.4)};',
+    ' var pw=mmToPx(281),ph=mmToPx(194);',
+    ' var cw=wrap.scrollWidth,ch=wrap.scrollHeight;',
+    ' var sc=Math.min(pw/cw,ph/ch,1);',
+    ' wrap.style.transform="scale("+sc+")";',
+    '});',
+    '<\/script>',
     '</head>',
     '<body>',
+    '<div id="wrap">',
     '<div id="hd">',
     '  <span class="ht">週間スケジュール表</span>',
     infoHtml,
@@ -1446,6 +1464,7 @@ function buildPrintHtml() {
     '  <col class="cd">',
     '  <col class="cs"><col class="cs"><col class="cs"><col class="cs">',
     '</colgroup>',
+    /* 横軸ヘッダー：曜日 / 朝 / 昼 / 夕 / 夜 */
     '<thead><tr>',
     '  <th>曜日</th>',
     '  <th class="hm">🌅 朝</th>',
@@ -1453,8 +1472,10 @@ function buildPrintHtml() {
     '  <th class="he">🌇 夕</th>',
     '  <th class="hni">🌙 夜</th>',
     '</tr></thead>',
+    /* 縦軸：月〜日 */
     '<tbody>', rowsHtml, '</tbody>',
     '</table>',
+    '</div>',
     '</body></html>',
   ].join('');
 }
