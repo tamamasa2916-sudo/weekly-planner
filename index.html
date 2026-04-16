@@ -21,20 +21,20 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <style>
   :root {
-    --bg: #f2f2f7;
-    --card: #ffffff;
-    --ink: #1c1c1e;
-    --ink2: #3a3a3c;
-    --muted: #8e8e93;
-    --sep: #c6c6c8;
-    --accent: #c4704a;
-    --blue: #007aff;
-    --red: #ff3b30;
-    --green: #34c759;
-    --morning: #fff3cd; --morning-ink: #856404;
-    --noon:    #d1e7dd; --noon-ink:    #0f5132;
-    --evening: #cfe2ff; --evening-ink: #084298;
-    --night:   #e2d9f3; --night-ink:   #432874;
+    --bg:      #eef1f6;
+    --card:    #ffffff;
+    --ink:     #1a1f2e;
+    --ink2:    #374151;
+    --muted:   #7b8494;
+    --sep:     #d1d5db;
+    --accent:  #2563eb;   /* プロフェッショナルブルー（旧オレンジから変更） */
+    --blue:    #2563eb;
+    --red:     #ef4444;
+    --green:   #16a34a;
+    --morning: #fef3c7; --morning-ink: #92400e;  /* アンバー */
+    --noon:    #d1fae5; --noon-ink:    #065f46;  /* エメラルド */
+    --evening: #dbeafe; --evening-ink: #1e3a8a;  /* ロイヤルブルー */
+    --night:   #ede9fe; --night-ink:   #4c1d95;  /* バイオレット */
     --safe-t: env(safe-area-inset-top,0px);
     --safe-b: env(safe-area-inset-bottom,0px);
     --safe-l: env(safe-area-inset-left,0px);
@@ -76,8 +76,8 @@
   #undo-btn:active:not(:disabled) { opacity: 0.6; }
 
   /* ══ カード ══ */
-  .day-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  .day-header { background: var(--ink2); color: #fff; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.1em; padding: 11px 16px; }
+  .day-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.09); }
+  .day-header { background: var(--accent); color: #fff; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.1em; padding: 11px 16px; }
   .slot-section { border-top: 1px solid var(--bg); }
   .day-header + .slot-section { border-top: none; }
   .slot-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px 6px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; }
@@ -134,7 +134,7 @@
   .bottom-bar {
     position: fixed; bottom: 0; left: 0; right: 0;
     padding: 8px 12px calc(8px + var(--safe-b)) 12px;
-    background: rgba(242,242,247,0.94);
+    background: rgba(238,241,246,0.95);
     -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     border-top: 1px solid var(--sep);
     display: flex; flex-direction: column; gap: 6px; z-index: 100;
@@ -148,8 +148,8 @@
   }
   .bar-btn:active { opacity: 0.65; }
   .bar-btn-ghost  { background: var(--card); color: var(--ink2); border: 1px solid var(--sep); }
-  .bar-btn-red    { background: #fff0ef; color: var(--red); border: 1px solid #ffcccb; }
-  .bar-btn-blue   { background: #e8f2ff; color: var(--blue); border: 1px solid #a8ceff; }
+  .bar-btn-red    { background: #fef2f2; color: var(--red); border: 1px solid #fca5a5; }
+  .bar-btn-blue   { background: #eff6ff; color: var(--blue); border: 1px solid #93c5fd; }
   .bar-btn-accent { background: var(--accent); color: #fff; }
   .bar-btn-wide   { flex: 2; }
 
@@ -291,11 +291,8 @@
   .modal-btn { flex: 1; height: 48px; font-family: inherit; font-size: 0.88rem; font-weight: 700; border-radius: 12px; border: none; cursor: pointer; }
   .modal-btn:active { opacity: 0.7; }
   .modal-btn-cancel { background: var(--bg); color: var(--ink2); }
-  .modal-btn-print  { background: #edfaf1; color: #1a7a3a; border: 1px solid #9adcb4; }
-  .modal-btn-txt    { background: #e8f2ff; color: var(--blue); }
+  .modal-btn-print  { background: #eff6ff; color: var(--blue); border: 1px solid #93c5fd; }
   .modal-btn-pdf    { background: var(--accent); color: white; }
-  /* 印刷ボタンはすべてのデバイスで表示（window.print() 直接呼び出しのため） */
-  /* @media (hover: none) and (pointer: coarse) { .pc-only { display: none !important; } } */
 
   /* ══ プルダウン管理ページ ══ */
   .opts-slot-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -309,7 +306,7 @@
   .opts-item-label { flex: 1; color: var(--ink); }
   .opts-item-label.base { color: var(--muted); font-size: 0.8rem; }
   .opts-item-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 8px; margin-right: 8px; background: var(--bg); color: var(--muted); }
-  .opts-item-del { height: 34px; padding: 0 12px; font-size: 0.78rem; font-weight: 600; font-family: inherit; border: none; border-radius: 8px; background: #fff0ef; color: var(--red); cursor: pointer; white-space: nowrap; }
+  .opts-item-del { height: 34px; padding: 0 12px; font-size: 0.78rem; font-weight: 600; font-family: inherit; border: none; border-radius: 8px; background: #fef2f2; color: var(--red); cursor: pointer; white-space: nowrap; }
   .opts-item-del:active { opacity: 0.65; }
   .opts-note { font-size: 0.75rem; color: var(--muted); padding: 10px 14px; text-align: center; }
 
@@ -345,8 +342,8 @@
     border-radius: 8px; border: none; cursor: pointer;
   }
   .hist-act-btn:active { opacity: 0.65; }
-  .hist-act-restore { background: #e8f2ff; color: var(--blue); }
-  .hist-act-delete  { background: #fff0ef; color: var(--red); }
+  .hist-act-restore { background: #eff6ff; color: var(--blue); }
+  .hist-act-delete  { background: #fef2f2; color: var(--red); }
 
   .hist-card-body { padding: 10px 14px 12px; }
   .hist-card-sub { font-size: 0.7rem; color: var(--muted); width: 100%; padding-top: 2px; }
@@ -625,7 +622,6 @@
     <div class="modal-footer" id="preview-footer">
       <button class="modal-btn modal-btn-cancel" onclick="closePreview()">閉じる</button>
       <button class="modal-btn modal-btn-print pc-only" id="btn-print" onclick="printSchedule()">🖨️ 印刷する</button>
-      <button class="modal-btn modal-btn-txt"    onclick="exportTxt()">📄 テキスト</button>
       <button class="modal-btn modal-btn-pdf"    onclick="savePdfDirect()">📥 PDF保存</button>
     </div>
   </div>
@@ -1328,18 +1324,28 @@ function closePreview() { document.getElementById('preview-modal').classList.rem
    印刷用 HTML 生成
    ─ 縦軸 = 曜日（月〜日 / 7行）  /  横軸 = 朝・昼・夕・夜（4列）
    ─ A4 横 @page: 297×210mm、余白 8mm → 印刷可能域: 281×194mm
-   ─ 各行の高さを均等固定し、セル内容は overflow:hidden でクリップ
-   ─ zoom (CSS) を body に設定して1ページ自動収束（安全装置）
-   ─ transform:scale は印刷エンジンに無視されるため絶対に使わない
 
-   寸法計算:
-     印刷可能域高さ 194mm
-     - 利用者情報ヘッダー (#hd) : 7mm  (高さ固定)
-     - #hd 下マージン           : 2mm
-     - テーブルヘッダー行       : 7mm  (高さ固定)
-     - 残り = 194 - 7 - 2 - 7  = 178mm
-     - 7行 × 行高さ             = 178mm  →  1行 = 25.43mm → 25mm (余裕確保)
-     ※ border(0.3mm×8本)≒2.4mm を差し引いても 25mm × 7 = 175mm < 178mm で収まる
+   ■ 寸法の精密設計（border-collapse 考慮）
+     印刷可能域高さ                : 194.00mm
+     #hd（情報ヘッダー高さ）       :   7.00mm
+     #hd border-bottom             :   0.50mm
+     #hd margin-bottom             :   2.00mm
+     ───────────────────────────────
+     テーブルに使える高さ          : 184.50mm
+     border-collapse 垂直ボーダー合計 :
+       上外枠(0.3) + thead下(0.3) + 行間6本(0.3×6) + 下外枠(0.3) = 2.60mm
+     ───────────────────────────────
+     thead + tbody 正味高さ        : 181.90mm
+     thead 行高さ                  :   7.00mm
+     tbody 7行に使える高さ         : 174.90mm
+     1行の高さ = 174.90 / 7        :  24.985mm → 24.98mm（切り捨て安全値）
+
+   ■ 行高さ固定の仕組み
+     tbody tr { height: ROW_H }     … 各行高さを固定
+     td { padding: 0 }              … td はコンテナのみ
+     .ci { height: ROW_H;           … display:block ラッパーで
+           overflow: hidden }          overflow:hidden を確実に機能させる
+     zoom 安全装置で万一のはみ出しを吸収
 ════════════════════════════════════════════════════════════════════════ */
 function buildPrintHtml() {
   const u = getUserInfo();
@@ -1362,135 +1368,89 @@ function buildPrintHtml() {
   /* ── テーブル行 HTML（縦=曜日 / 横=朝昼夕夜）── */
   const rowsHtml = DAYS.map(function(day) {
     const d = escHtml(day.replace('曜日', ''));
-    /* 曜日セル: td.dc は vertical-align:middle で中央揃え。.ci 不要 */
+    /* 曜日セル: vertical-align:middle で中央揃え（.ci 不要） */
     let cells = '<td class="dc"><span class="dc-main">' + d + '</span>'
               + '<span class="dc-sub">曜日</span></td>';
     SLOTS.forEach(function(slot) {
       const tags = getTags(day, slot);
-      if (tags.length) {
-        /*
-         * [Fix] overflow:hidden を display:table-cell の td に直接設定しても
-         *       Safari/Firefox 印刷エンジンでは無視される。
-         *       → display:block な .ci ラッパーで確実に overflow:hidden を適用。
-         */
-        cells += '<td><div class="ci"><div class="tw">'
-          + tags.map(function(t) {
-              return '<span class="tc ' + slot + '">' + escHtml(t) + '</span>';
-            }).join('')
-          + '</div></div></td>';
-      } else {
-        cells += '<td><div class="ci"><span class="te">─</span></div></td>';
-      }
+      /* display:block な .ci ラッパーで overflow:hidden を確実に機能させる */
+      cells += tags.length
+        ? '<td><div class="ci"><div class="tw">'
+            + tags.map(function(t) {
+                return '<span class="tc ' + slot + '">' + escHtml(t) + '</span>';
+              }).join('')
+            + '</div></div></td>'
+        : '<td><div class="ci"><span class="te">─</span></div></td>';
     });
     return '<tr>' + cells + '</tr>';
   }).join('');
 
-  /* ── CSS ──
-   * 行高さは上記計算に基づき 25mm に固定。
-   * セル内容が溢れた場合は overflow:hidden でクリップ（行高さを変えない）。
-   * zoom:1 は JS (_applyPrintZoom) が上書きする安全装置用プレースホルダ。
-   */
-  const ROW_H  = '25mm';
-  const HEAD_H = '7mm';
   const INFO_H = '7mm';
+  const HEAD_H = '7mm';
+  const ROW_H  = '24.98mm'; /* 174.90mm ÷ 7 = 24.985mm → 切り捨て */
 
   const css = [
-    /* ページ設定 */
     '@page{size:A4 landscape;margin:8mm}',
     '*{box-sizing:border-box;margin:0;padding:0;',
     ' -webkit-print-color-adjust:exact;print-color-adjust:exact}',
     'html,body{background:#fff}',
-
-    /* body: 幅を印刷可能域に固定。zoom は JS が上書き */
     'body{width:281mm;margin:0;padding:0;',
     ' font-family:"Noto Sans JP",-apple-system,sans-serif;',
-    ' color:#1c1c1e;zoom:1}',
+    ' color:#1a1f2e;zoom:1}',
 
-    /* ── 利用者情報ヘッダー ── */
-    /* 高さ固定: INFO_H。文字が溢れても行高を変えない */
+    /* 利用者情報ヘッダー: 高さ固定 7mm */
     '#hd{display:flex;align-items:center;flex-wrap:nowrap;',
-    ' height:' + INFO_H + ';overflow:hidden;',
-    ' gap:4mm;padding-bottom:1mm;',
-    ' border-bottom:.5mm solid #3a3a3c;margin-bottom:2mm;',
+    ' height:' + INFO_H + ';overflow:hidden;gap:5mm;',
+    ' border-bottom:.5mm solid #1a1f2e;margin-bottom:2mm;',
     ' font-size:7.5pt;white-space:nowrap}',
     '.ht{font-size:10pt;font-weight:700;letter-spacing:.05em;',
-    ' flex-shrink:0;margin-right:3mm}',
-    '.fi{color:#3a3a3c;flex-shrink:0}',
+    ' flex-shrink:0;margin-right:4mm}',
+    '.fi{color:#374151;flex-shrink:0;margin-right:3mm}',
     '.fl{font-weight:700;margin-right:.3mm}',
 
-    /* ── テーブル全体 ──
-     * [Fix] border-collapse:collapse 使用時、table 自体に border を
-     *       指定しても無視される。外枠は th/td の border で描画される。
-     *       → table の border 指定を削除。
-     */
-    'table{width:100%;border-collapse:collapse;table-layout:fixed}',
-
-    /* 列幅: 曜日 12mm / 時間帯4列 = (281-12)/4 = 67.25mm */
+    /* テーブル: border-collapse 時は table 自体に border を指定しない */
+    'table{width:281mm;border-collapse:collapse;table-layout:fixed}',
     'col.cd{width:12mm}',
     'col.cs{width:67.25mm}',
 
-    /* ── ヘッダー行（高さ固定: HEAD_H）── */
+    /* ヘッダー行: 高さ固定 HEAD_H */
     'thead tr{height:' + HEAD_H + '}',
-    'th{border:.3mm solid #999;',
-    ' font-weight:700;font-size:8.5pt;',
-    ' text-align:center;padding:0 1mm;',
-    ' white-space:nowrap;overflow:hidden;',
-    ' background:#3a3a3c;color:#fff;',
-    ' vertical-align:middle}',
-    'th.hm{background:#7a5800;color:#fff}',
-    'th.hn{background:#0a3d22;color:#fff}',
-    'th.he{background:#05316e;color:#fff}',
-    'th.hni{background:#2e1a52;color:#fff}',
+    'th{border:.3mm solid #4b5563;font-weight:700;font-size:8pt;',
+    ' text-align:center;padding:0 1mm;white-space:nowrap;',
+    ' overflow:hidden;vertical-align:middle}',
+    'th:first-child{background:#1e3a5f;color:#fff}',
+    'th.hm{background:#92400e;color:#fff}',
+    'th.hn{background:#065f46;color:#fff}',
+    'th.he{background:#1e3a8a;color:#fff}',
+    'th.hni{background:#4c1d95;color:#fff}',
 
-    /* ── データ行（高さ固定: ROW_H）── */
+    /* データ行: 高さを ROW_H に完全固定 */
     'tbody tr{height:' + ROW_H + '}',
+    /* td は padding:0 のコンテナのみ。overflow:hidden は .ci で管理 */
+    'td{border:.3mm solid #d1d5db;height:' + ROW_H + ';padding:0;vertical-align:top}',
 
-    /*
-     * [Fix] display:table-cell な td に overflow:hidden を設定しても
-     *       Safari/Firefox 印刷エンジンでは機能しない仕様がある。
-     *       → td は padding:0 のコンテナとし、内部に display:block な
-     *         .ci（cell-inner）を置いて、そちらで overflow:hidden を管理。
-     */
-    'td{border:.3mm solid #ccc;',
-    ' height:' + ROW_H + ';',
-    ' padding:0;vertical-align:top}',
+    /* .ci: display:block により overflow:hidden が全ブラウザで確実に機能 */
+    '.ci{display:block;height:' + ROW_H + ';overflow:hidden;',
+    ' padding:1.2mm 1.5mm;font-size:7pt;line-height:1.5}',
 
-    /* セル内ラッパー: display:block なので overflow:hidden が確実に機能する */
-    '.ci{display:block;',
-    ' height:' + ROW_H + ';overflow:hidden;',
-    ' padding:1.5mm 1.5mm;',
-    ' font-size:7pt;line-height:1.5}',
-
-    /* 曜日セル: 中央揃えのためラッパー不要・td 直接スタイル */
-    'td.dc{background:#f4f4f8;text-align:center;',
-    ' vertical-align:middle;padding:0;border-color:#999}',
+    /* 曜日セル */
+    'td.dc{background:#f1f5f9;text-align:center;',
+    ' vertical-align:middle;padding:0;border-color:#4b5563}',
     '.dc-main{display:block;font-weight:700;font-size:10pt;',
-    ' line-height:1.2;color:#1c1c1e}',
-    '.dc-sub{display:block;font-size:6.5pt;font-weight:400;',
-    ' color:#666;margin-top:.5mm}',
-
-    /* タグチップラッパー: .ci が overflow:hidden を担うため max-height 不要 */
-    '.tw{display:flex;flex-wrap:wrap;',
-    ' gap:.8mm;align-content:flex-start}',
+    ' line-height:1.2;color:#1e3a5f}',
+    '.dc-sub{display:block;font-size:6pt;font-weight:400;',
+    ' color:#6b7280;margin-top:.5mm}',
 
     /* タグチップ */
+    '.tw{display:flex;flex-wrap:wrap;gap:.8mm;align-content:flex-start}',
     '.tc{display:inline-block;font-size:6.5pt;font-weight:500;',
-    ' padding:.4mm 2mm;border-radius:3px;',
-    ' white-space:nowrap;line-height:1.5}',
-    '.tc.morning{background:#fff3cd;color:#6b4e00}',
-    '.tc.noon   {background:#d1e7dd;color:#0a3d22}',
-    '.tc.evening{background:#cfe2ff;color:#05316e}',
-    '.tc.night  {background:#e2d9f3;color:#2e1a52}',
+    ' padding:.4mm 2mm;border-radius:3px;white-space:nowrap;line-height:1.5}',
+    '.tc.morning{background:#fef3c7;color:#92400e}',
+    '.tc.noon   {background:#d1fae5;color:#065f46}',
+    '.tc.evening{background:#dbeafe;color:#1e3a8a}',
+    '.tc.night  {background:#ede9fe;color:#4c1d95}',
+    '.te{color:#d1d5db;font-size:7pt}',
 
-    /* 空セル */
-    '.te{color:#ccc;font-size:7pt}',
-
-    /*
-     * [Fix] @media print 内の body{zoom:inherit} を削除。
-     *       zoom:inherit は html の zoom を継承するだけで、
-     *       JS が設定した inline style の zoom とは無関係。
-     *       JS の inline style は常に CSS 規則より優先されるため不要。
-     */
     '@media print{',
     ' table{page-break-inside:avoid;break-inside:avoid}',
     ' tbody tr{page-break-inside:avoid;break-inside:avoid}',
@@ -1508,12 +1468,10 @@ function buildPrintHtml() {
     '<style>', css, '</style>',
     '</head>',
     '<body>',
-      /* 利用者情報ヘッダー */
       '<div id="hd">',
         '<span class="ht">週間スケジュール表</span>',
         infoHtml,
       '</div>',
-      /* スケジュールテーブル */
       '<table>',
         '<colgroup>',
           '<col class="cd">',
