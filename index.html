@@ -1215,29 +1215,32 @@ function closePreview() { document.getElementById('preview-modal').classList.rem
 /* ══════════════════════════════════════════════════════════════════════
    印刷用 HTML 生成  — Android Chrome / iOS Safari / PC 共通対応版
    ────────────────────────────────────────────────────────────────────
-   ■ スマホ印刷の制約（ブラウザ仕様）
-     - Android Chrome : @page size / transform は印刷時に無視される
-                        window.print() は動作するが用紙設定はダイアログで手動
-     - iOS Safari     : @page size 完全無視。window.print() → 共有シート → 印刷
-     - PC Chrome/Edge : @page size + transform:scale(0.8) が有効
-   ■ 対策
-     - 印刷HTMLページ上部に【設定ガイドバー】を表示
-       → 「横向き・サイズ80%」をユーザーへ明示案内
-     - @media print でガイドバーを非表示
-     - UA判定でAndroid/iOS別の操作手順をガイドに表示
-     - transform:scale(0.8) はPCでのみ有効、スマホは手動設定案内でカバー
-   ■ 寸法設計（A4横 margin:8mm）
-     PAGE: 281×194mm / HD: 9.5mm / TH: 7mm
-     ROW_H: (177.5-0.5)/7 = 25.2mm（安全余白込み）
+   ■ 寸法設計（A4横 @page margin:5mm → 印刷可能域 287mm × 200mm）
+     - ヘッダー  :  8mm + border+margin 1.5mm = 9.5mm
+     - thead     :  7mm
+     - tbody     : 200 - 9.5 - 7 - 0.5(安全余白) = 183mm → 26.1mm × 7行
+     - 合計      : 199.2mm（余白 0.8mm）
+     - テーブル幅: 287mm（印刷可能域フル活用）
+   ■ センタリング
+     - transform-origin:center top → 水平方向は中央揃え
+     - body を margin:0 auto で中央配置
+   ■ スマホ対策
+     - UA判定でAndroid/iOS/PCの操作ガイドを表示
+     - PCのみ自動印刷、スマホはガイドバーを見て手動操作
 ══════════════════════════════════════════════════════════════════════ */
 function buildPrintHtml(mode) {
   var u = getUserInfo();
 
-  /* ── 寸法定数（mm） ── */
-  var PAGE_W = 281, PAGE_H = 194;
-  var HD_H = 8, HD_MB = 1.5, TH_H = 7, ROWS = 7;
-  var ROW_H = Math.floor((PAGE_H - HD_H - HD_MB - TH_H - 0.5) / ROWS * 10) / 10;
-  var TAG_H = Math.round((ROW_H - 2.5) * 10) / 10;
+  /* ── 寸法定数（mm）──
+     @page margin:5mm → A4横印刷可能域 287mm × 200mm          */
+  var PAGE_W = 287;   // 297 - 5×2
+  var PAGE_H = 200;   // 210 - 5×2
+  var HD_H   = 8;     // ヘッダー高さ
+  var HD_MB  = 1.5;   // ヘッダー border+margin
+  var TH_H   = 7;     // thead 高さ
+  var ROWS   = 7;     // 曜日行数（月〜日）
+  var ROW_H  = Math.floor((PAGE_H - HD_H - HD_MB - TH_H - 0.5) / ROWS * 10) / 10; // 26.1mm
+  var TAG_H  = Math.round((ROW_H - 2.4) * 10) / 10; // タグ表示域
 
   /* ── 利用者情報ヘッダー HTML ── */
   var infoHtml = '';
@@ -1277,129 +1280,179 @@ function buildPrintHtml(mode) {
     '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">',
     '<style>',
 
-    /* リセット・背景色印刷 */
-    '*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+    /* ── リセット・背景色印刷 ── */
+    '*{box-sizing:border-box;margin:0;padding:0;',
+    ' -webkit-print-color-adjust:exact;print-color-adjust:exact}',
     colorForce,
-    'body{font-family:"Noto Sans JP",-apple-system,sans-serif;color:#1c1c1e;background:#fff}',
+
+    /* ── ページ設定：A4横、余白5mm（最小余白でフル活用）── */
+    '@page{size:A4 landscape;margin:5mm}',
+
+    /* ── body：画面プレビュー用スタイル ── */
+    'html{background:#e0e0e0;min-height:100vh}',
+    'body{',
+    ' font-family:"Noto Sans JP",-apple-system,sans-serif;',
+    ' color:#1c1c1e;background:#e0e0e0;',
+    ' padding:0;margin:0;',
+    '}',
 
     /* ── 設定ガイドバー（画面表示のみ・印刷時は非表示）── */
     '#guide{',
     ' background:#1c1c1e;color:#fff;',
-    ' padding:12px 16px;font-size:13px;line-height:1.7;',
+    ' padding:14px 18px;font-size:13px;line-height:1.75;',
     '}',
-    '#guide h2{font-size:15px;font-weight:700;margin-bottom:6px;color:#ffd60a}',
-    '#guide .step{display:flex;gap:8px;align-items:flex-start;margin-bottom:4px}',
+    '#guide h2{font-size:15px;font-weight:700;margin-bottom:8px;color:#ffd60a}',
+    '#guide .step{display:flex;gap:8px;align-items:flex-start;margin-bottom:5px}',
     '#guide .num{',
     ' background:#ffd60a;color:#1c1c1e;border-radius:50%;',
-    ' width:20px;height:20px;min-width:20px;',
+    ' width:22px;height:22px;min-width:22px;',
     ' display:flex;align-items:center;justify-content:center;',
-    ' font-weight:700;font-size:12px;',
+    ' font-weight:700;font-size:12px;margin-top:1px;',
     '}',
     '#guide .android{display:none}',
     '#guide .ios{display:none}',
     '#guide .pc{display:none}',
     '#guide-close{',
-    ' display:block;width:100%;margin-top:10px;padding:10px;',
+    ' display:block;width:100%;margin-top:12px;padding:10px;',
     ' background:#ffd60a;color:#1c1c1e;border:none;border-radius:8px;',
     ' font-size:14px;font-weight:700;cursor:pointer;',
     '}',
 
-    /* ── 印刷レイアウト ── */
-    '@page{size:A4 landscape;margin:8mm}',
-
-    '#wrap{',
+    /* ── 印刷表 ラッパー：センタリング＋A4サイズ固定 ── */
+    /* 画面プレビュー：白紙（A4横）をセンター表示              */
+    '#sheet{',
     ' width:' + PAGE_W + 'mm;',
     ' height:' + PAGE_H + 'mm;',
+    ' margin:16px auto;',          /* 画面での中央表示 */
+    ' background:#fff;',
     ' overflow:hidden;',
-    /* PCではscale(0.8)で1ページ確実収縮 */
-    ' transform:scale(0.8);',
-    ' transform-origin:top left;',
+    ' box-shadow:0 2px 16px rgba(0,0,0,0.18);',
+    ' padding:0;',
     '}',
 
-    '#hd{height:' + HD_H + 'mm;display:flex;align-items:center;gap:4mm;',
-    '    border-bottom:.4mm solid #3a3a3c;margin-bottom:' + HD_MB + 'mm;',
-    '    font-size:7.5pt;overflow:hidden;flex-shrink:0}',
-    '.ht{font-size:10pt;font-weight:700;letter-spacing:.06em;white-space:nowrap;margin-right:2mm}',
+    /* ── 利用者情報ヘッダー ── */
+    '#hd{',
+    ' height:' + HD_H + 'mm;min-height:' + HD_H + 'mm;',
+    ' display:flex;align-items:center;gap:4mm;',
+    ' border-bottom:.5mm solid #3a3a3c;',
+    ' margin-bottom:' + HD_MB + 'mm;',
+    ' font-size:8pt;overflow:hidden;flex-shrink:0;',
+    ' padding:0 2mm;',
+    '}',
+    '.ht{font-size:10.5pt;font-weight:700;letter-spacing:.06em;white-space:nowrap;margin-right:3mm}',
     '.fl{font-weight:700;margin-right:.5mm}',
-    '.fi{color:#3a3a3c;white-space:nowrap;margin-right:3mm}',
+    '.fi{color:#3a3a3c;white-space:nowrap;margin-right:4mm}',
 
-    'table{width:' + PAGE_W + 'mm;border-collapse:collapse;table-layout:fixed}',
-    'col.cd{width:10%}col.cs{width:22.5%}',
+    /* ── スケジュールテーブル：幅 PAGE_W mm フル活用 ── */
+    'table{',
+    ' width:' + PAGE_W + 'mm;',
+    ' border-collapse:collapse;table-layout:fixed;',
+    '}',
+    /* 曜日列 9%、時間帯4列 各22.75% → 合計100% */
+    'col.cd{width:9%}col.cs{width:22.75%}',
+
+    /* thead：ヘッダー行 */
     'thead tr{height:' + TH_H + 'mm}',
-    'th{border:.25mm solid #9a9a9a;font-weight:700;font-size:8pt;',
-    '  text-align:center;padding:1mm;white-space:nowrap;',
-    '  background:#f0f0f5;vertical-align:middle;overflow:hidden}',
-    'thead th:first-child{background:#3a3a3c;color:#fff}',
-    '.hm{color:#856404}.hn{color:#0f5132}.he{color:#084298}.hni{color:#432874}',
+    'th{',
+    ' border:.3mm solid #888;',
+    ' font-weight:700;font-size:8.5pt;',
+    ' text-align:center;padding:1.2mm;',
+    ' white-space:nowrap;background:#eeeef4;',
+    ' vertical-align:middle;overflow:hidden;',
+    '}',
+    'thead th:first-child{background:#2c2c2e;color:#fff;font-size:8pt}',
+    '.hm{color:#7a5c00}.hn{color:#0a4a2a}.he{color:#073a8a}.hni{color:#3a1f66}',
 
+    /* tbody：7行均等・高さ完全固定 */
     'tbody tr{height:' + ROW_H + 'mm;max-height:' + ROW_H + 'mm}',
-    'td{border:.25mm solid #9a9a9a;padding:1.2mm 1.5mm;',
-    '  vertical-align:top;overflow:hidden;',
-    '  font-size:7pt;line-height:1.35;',
-    '  height:' + ROW_H + 'mm;max-height:' + ROW_H + 'mm}',
-    'td.dc{font-weight:700;font-size:8.5pt;text-align:center;vertical-align:middle;background:#f0f0f5;white-space:pre}',
+    'td{',
+    ' border:.3mm solid #888;',
+    ' padding:1.5mm 2mm;',
+    ' vertical-align:top;overflow:hidden;',
+    ' font-size:7.5pt;line-height:1.4;',
+    ' height:' + ROW_H + 'mm;max-height:' + ROW_H + 'mm;',
+    '}',
 
-    '.tw{display:flex;flex-wrap:wrap;gap:.6mm;align-content:flex-start;overflow:hidden;max-height:' + TAG_H + 'mm}',
-    '.tc{display:inline-block;font-size:6.5pt;font-weight:500;padding:.35mm 1.8mm;border-radius:2px;white-space:nowrap;line-height:1.45}',
-    '.tc.morning{background:#fff3cd;color:#856404}',
-    '.tc.noon{background:#d1e7dd;color:#0f5132}',
-    '.tc.evening{background:#cfe2ff;color:#084298}',
-    '.tc.night{background:#e2d9f3;color:#432874}',
-    '.te{color:#aaa;font-size:7pt}',
+    /* 曜日ラベルセル */
+    'td.dc{',
+    ' font-weight:700;font-size:9pt;',
+    ' text-align:center;vertical-align:middle;',
+    ' background:#eeeef4;white-space:pre;',
+    ' letter-spacing:.02em;',
+    '}',
 
-    /* 印刷時：ガイドバー非表示・レイアウト維持 */
+    /* タグコンテナ */
+    '.tw{',
+    ' display:flex;flex-wrap:wrap;',
+    ' gap:.7mm;align-content:flex-start;',
+    ' overflow:hidden;',
+    ' max-height:' + TAG_H + 'mm;',
+    '}',
+
+    /* タグチップ */
+    '.tc{',
+    ' display:inline-block;font-size:7pt;font-weight:500;',
+    ' padding:.5mm 2mm;border-radius:3px;',
+    ' white-space:nowrap;line-height:1.5;',
+    '}',
+    '.tc.morning{background:#fff3cd;color:#7a5c00}',
+    '.tc.noon   {background:#d1e7dd;color:#0a4a2a}',
+    '.tc.evening{background:#cfe2ff;color:#073a8a}',
+    '.tc.night  {background:#e2d9f3;color:#3a1f66}',
+    '.te{color:#bbb;font-size:7pt}',
+
+    /* ── @media print ──
+       ガイドバー非表示・html/bodyを白に・#sheetをページいっぱいに
+       transform-origin:center top でA4中央揃え               */
     '@media print{',
     ' #guide{display:none!important}',
-    ' body{margin:0;padding:0}',
-    ' #wrap{transform:scale(0.8)!important;transform-origin:top left!important;',
-    '       width:' + PAGE_W + 'mm!important;height:' + PAGE_H + 'mm!important;overflow:hidden!important}',
+    ' html{background:#fff!important;padding:0!important;margin:0!important}',
+    ' body{background:#fff!important;padding:0!important;margin:0!important}',
+    ' #sheet{',
+    '   margin:0 auto!important;',           /* 水平方向センタリング */
+    '   box-shadow:none!important;',
+    '   width:' + PAGE_W + 'mm!important;',
+    '   height:' + PAGE_H + 'mm!important;',
+    '   overflow:hidden!important;',
+    ' }',
     ' table{page-break-inside:avoid;break-inside:avoid}',
-    ' tbody tr{page-break-inside:avoid;break-inside:avoid;',
-    '          height:' + ROW_H + 'mm!important;max-height:' + ROW_H + 'mm!important}',
-    ' td{height:' + ROW_H + 'mm!important;max-height:' + ROW_H + 'mm!important}',
+    ' tbody tr{',
+    '   page-break-inside:avoid;break-inside:avoid;',
+    '   height:' + ROW_H + 'mm!important;',
+    '   max-height:' + ROW_H + 'mm!important;',
+    ' }',
+    ' td{',
+    '   height:' + ROW_H + 'mm!important;',
+    '   max-height:' + ROW_H + 'mm!important;',
+    ' }',
     '}',
     '</style>',
 
-    /* UA判定＋ガイド表示＋自動印刷スクリプト */
+    /* ── UA判定＋ガイド表示＋PC自動印刷 ── */
     '<script>',
     '(function(){',
     '  var ua=navigator.userAgent;',
     '  var isAndroid=/Android/i.test(ua);',
     '  var isIOS=/iPhone|iPad|iPod/i.test(ua);',
     '  var isPC=!isAndroid&&!isIOS;',
-
-    /* ガイドバーのOS別テキストを表示 */
     '  function showGuide(){',
     '    var g=document.getElementById("guide");',
     '    if(!g)return;',
-    '    if(isAndroid){',
-    '      g.querySelector(".android").style.display="block";',
-    '    }else if(isIOS){',
-    '      g.querySelector(".ios").style.display="block";',
-    '    }else{',
-    '      g.querySelector(".pc").style.display="block";',
-    '    }',
+    '    if(isAndroid)g.querySelector(".android").style.display="block";',
+    '    else if(isIOS)g.querySelector(".ios").style.display="block";',
+    '    else g.querySelector(".pc").style.display="block";',
     '  }',
-
-    /* 閉じるボタン */
     '  window.closeGuide=function(){',
     '    var g=document.getElementById("guide");',
     '    if(g)g.style.display="none";',
     '  };',
-
-    /* 自動印刷：PCのみ自動実行。スマホはガイドを見てから手動 */
-    '  function autoPrint(){',
+    '  document.addEventListener("DOMContentLoaded",function(){',
+    '    showGuide();',
     '    if(isPC){',
     '      document.fonts.ready.then(function(){',
     '        setTimeout(function(){window.print();},400);',
     '      });',
     '    }',
-    '    /* スマホ：ガイドバーを表示してユーザーに操作してもらう */',
-    '  }',
-
-    '  document.addEventListener("DOMContentLoaded",function(){',
-    '    showGuide();',
-    '    autoPrint();',
     '  });',
     '})();',
     '<\/script>',
@@ -1410,47 +1463,45 @@ function buildPrintHtml(mode) {
     /* ── 設定ガイドバー ── */
     '<div id="guide">',
     '  <h2>📋 印刷の前に設定してください</h2>',
-
-    /* Android 用ガイド */
     '  <div class="android">',
-    '    <div class="step"><span class="num">1</span><span>画面右上の <b>⋮（メニュー）</b> → <b>印刷</b> をタップ</span></div>',
-    '    <div class="step"><span class="num">2</span><span>印刷設定で <b>用紙の向き：横</b> を選択</span></div>',
-    '    <div class="step"><span class="num">3</span><span><b>ページに合わせる</b> または <b>縮小率80%</b> に設定</span></div>',
-    '    <div class="step"><span class="num">4</span><span>プリンターを選んで印刷ボタンをタップ</span></div>',
+    '    <div class="step"><span class="num">1</span><span>右上の <b>⋮（メニュー）</b> → <b>印刷</b> をタップ</span></div>',
+    '    <div class="step"><span class="num">2</span><span>用紙の向き：<b>横</b> を選択</span></div>',
+    '    <div class="step"><span class="num">3</span><span><b>ページに合わせる</b> または 縮小率 <b>80〜90%</b> に設定</span></div>',
+    '    <div class="step"><span class="num">4</span><span>プリンターを選んで印刷をタップ</span></div>',
     '  </div>',
-
-    /* iOS 用ガイド */
     '  <div class="ios">',
-    '    <div class="step"><span class="num">1</span><span>画面下部の <b>共有ボタン（□↑）</b> をタップ</span></div>',
-    '    <div class="step"><span class="num">2</span><span><b>プリント</b> を選択</span></div>',
-    '    <div class="step"><span class="num">3</span><span>プリンタプレビューで <b>用紙の向き：横向き</b> を設定</span></div>',
-    '    <div class="step"><span class="num">4</span><span><b>倍率</b> を <b>80%</b> に設定してプリントをタップ</span></div>',
+    '    <div class="step"><span class="num">1</span><span>下部の <b>共有ボタン（□↑）</b> → <b>プリント</b></span></div>',
+    '    <div class="step"><span class="num">2</span><span>用紙の向き：<b>横向き</b> を設定</span></div>',
+    '    <div class="step"><span class="num">3</span><span>倍率を <b>90〜100%</b> に設定してプリントをタップ</span></div>',
     '  </div>',
-
-    /* PC 用ガイド */
     '  <div class="pc">',
     '    <div class="step"><span class="num">1</span><span>印刷ダイアログが自動で開きます</span></div>',
-    '    <div class="step"><span class="num">2</span><span><b>用紙の向き：横</b> を確認</span></div>',
-    '    <div class="step"><span class="num">3</span><span><b>縮小率80%</b> またはページに合わせるに設定</span></div>',
+    '    <div class="step"><span class="num">2</span><span>用紙の向き：<b>横</b> を確認</span></div>',
+    '    <div class="step"><span class="num">3</span><span>余白：<b>なし</b> または <b>最小</b> を選択すると1枚に収まります</span></div>',
     '  </div>',
-
-    '  <button id="guide-close" onclick="closeGuide()">✕ ガイドを閉じる（印刷後に不要な場合）</button>',
+    '  <button id="guide-close" onclick="closeGuide()">✕ ガイドを閉じる</button>',
     '</div>',
 
-    /* ── スケジュール表本体 ── */
-    '<div id="wrap">',
-    '<div id="hd"><span class="ht">週間スケジュール表</span>', infoHtml, '</div>',
-    '<table>',
-    '<colgroup><col class="cd"><col class="cs"><col class="cs"><col class="cs"><col class="cs"></colgroup>',
-    '<thead><tr>',
-    '<th>曜日</th>',
-    '<th class="hm">🌅 朝</th>',
-    '<th class="hn">☀️ 昼</th>',
-    '<th class="he">🌇 夕</th>',
-    '<th class="hni">🌙 夜</th>',
-    '</tr></thead>',
-    '<tbody>', rowsHtml, '</tbody>',
-    '</table>',
+    /* ── A4シート（センタリングされた印刷表） ── */
+    '<div id="sheet">',
+    '  <div id="hd">',
+    '    <span class="ht">週間スケジュール表</span>',
+    infoHtml,
+    '  </div>',
+    '  <table>',
+    '    <colgroup>',
+    '      <col class="cd">',
+    '      <col class="cs"><col class="cs"><col class="cs"><col class="cs">',
+    '    </colgroup>',
+    '    <thead><tr>',
+    '      <th>曜日</th>',
+    '      <th class="hm">🌅 朝</th>',
+    '      <th class="hn">☀️ 昼</th>',
+    '      <th class="he">🌇 夕</th>',
+    '      <th class="hni">🌙 夜</th>',
+    '    </tr></thead>',
+    '    <tbody>', rowsHtml, '</tbody>',
+    '  </table>',
     '</div>',
 
     '</body></html>',
