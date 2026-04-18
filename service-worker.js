@@ -1,15 +1,27 @@
 /* ═══════════════════════════════════════════════════════════
-   週間スケジュール表 — Service Worker  v2.0
+   週間スケジュール表 — Service Worker  v2.1
    ─ キャッシュ優先（Cache First）戦略
    ─ オフライン完全対応
-   ─ バックグラウンド同期なし（localStorage のみ使用）
+   ─ iOS 12 対応（Promise.allSettled ポリフィル）
 ═══════════════════════════════════════════════════════════ */
 'use strict';
 
 const CACHE_VERSION = 'schedule-v2';
 const CACHE_STATIC  = CACHE_VERSION + '-static';
 
-/* キャッシュするファイル（バージョンが変わると全再取得） */
+/* iOS 12 以下向け Promise.allSettled ポリフィル */
+if (typeof Promise.allSettled === 'undefined') {
+  Promise.allSettled = function(promises) {
+    return Promise.all(promises.map(function(p) {
+      return Promise.resolve(p).then(
+        function(v) { return { status: 'fulfilled', value: v }; },
+        function(e) { return { status: 'rejected',  reason: e }; }
+      );
+    }));
+  };
+}
+
+/* キャッシュするファイル */
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -21,27 +33,21 @@ const STATIC_ASSETS = [
   './icon-512-maskable.png',
 ];
 
-/* Google Fonts はネットワーク優先でキャッシュに追加 */
 const FONT_ORIGIN = 'https://fonts.googleapis.com';
 const FONT_STATIC = 'https://fonts.gstatic.com';
 
 /* ── install：静的アセットを事前キャッシュ ── */
 self.addEventListener('install', function(event) {
-  console.log('[SW] Installing', CACHE_VERSION);
   event.waitUntil(
     caches.open(CACHE_STATIC)
       .then(function(cache) {
-        /* 個別に add して、1つ失敗しても他を止めない */
         return Promise.allSettled(
           STATIC_ASSETS.map(function(url) {
-            return cache.add(url).catch(function(err) {
-              console.warn('[SW] cache.add failed:', url, err);
-            });
+            return cache.add(url).catch(function() { /* 失敗しても続行 */ });
           })
         );
       })
       .then(function() {
-        /* 待機せず即アクティベート */
         return self.skipWaiting();
       })
   );
@@ -49,21 +55,16 @@ self.addEventListener('install', function(event) {
 
 /* ── activate：古いキャッシュを削除 ── */
 self.addEventListener('activate', function(event) {
-  console.log('[SW] Activating', CACHE_VERSION);
   event.waitUntil(
     caches.keys()
       .then(function(keys) {
         return Promise.all(
           keys
             .filter(function(k) { return k !== CACHE_STATIC; })
-            .map(function(k) {
-              console.log('[SW] Deleting old cache:', k);
-              return caches.delete(k);
-            })
+            .map(function(k) { return caches.delete(k); })
         );
       })
       .then(function() {
-        /* 既存クライアントを即座に制御下に */
         return self.clients.claim();
       })
   );
@@ -71,13 +72,12 @@ self.addEventListener('activate', function(event) {
 
 /* ── fetch：リクエスト戦略の振り分け ── */
 self.addEventListener('fetch', function(event) {
-  const req = event.request;
-  const url = new URL(req.url);
+  var req = event.request;
+  var url = new URL(req.url);
 
-  /* POST / 非GETは素通し */
   if (req.method !== 'GET') return;
 
-  /* Google Fonts CSS → ネットワーク優先、失敗時はキャッシュ */
+  /* Google Fonts CSS → ネットワーク優先 */
   if (url.origin === FONT_ORIGIN) {
     event.respondWith(networkFirstWithCache(req));
     return;
@@ -89,27 +89,24 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  /* 同一オリジンの静的ファイル → キャッシュ優先 */
+  /* 同一オリジン → キャッシュ優先 */
   if (url.origin === self.location.origin) {
     event.respondWith(cacheFirstWithNetwork(req));
     return;
   }
-
-  /* それ以外（外部API等）→ ネットワークのみ */
 });
 
-/* キャッシュ優先：キャッシュになければネットワーク取得してキャッシュに追加 */
+/* キャッシュ優先 */
 function cacheFirstWithNetwork(req) {
   return caches.match(req).then(function(cached) {
     if (cached) return cached;
     return fetchAndCache(req);
   }).catch(function() {
-    /* 完全オフライン時：index.html を返す */
     return caches.match('./index.html');
   });
 }
 
-/* ネットワーク優先：失敗時はキャッシュにフォールバック */
+/* ネットワーク優先 */
 function networkFirstWithCache(req) {
   return fetchAndCache(req).catch(function() {
     return caches.match(req).then(function(cached) {
@@ -132,16 +129,9 @@ function fetchAndCache(req) {
   });
 }
 
-/* ── メッセージ：キャッシュ強制更新（デバッグ用）── */
+/* ── メッセージ：キャッシュ強制更新 ── */
 self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
-  }
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
-    caches.keys().then(function(keys) {
-      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-    }).then(function() {
-      console.log('[SW] All caches cleared');
-    });
   }
 });

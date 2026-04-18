@@ -298,10 +298,7 @@
   .modal-btn-cancel { background: var(--bg); color: var(--ink2); }
   .modal-btn-print  { background: #edfaf1; color: #1a7a3a; border: 1px solid #9adcb4; }
   .modal-btn-txt    { background: #e8f2ff; color: var(--blue); }
-  .modal-btn-pdf    { background: var(--accent); color: white; }
   .modal-btn-pdf2   { background: #4a1a6e; color: white; } /* PDF専用（紫） */
-  /* 印刷ボタンはすべてのデバイスで表示（window.print() 直接呼び出しのため） */
-  /* @media (hover: none) and (pointer: coarse) { .pc-only { display: none !important; } } */
 
   /* ══ プルダウン管理ページ ══ */
   .opts-slot-card { background: var(--card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -1216,41 +1213,38 @@ function openPreview() {
 function closePreview() { document.getElementById('preview-modal').classList.remove('open'); }
 
 /* ══════════════════════════════════════════════════════════════════════
-   印刷用 HTML 生成
-   ─ 縦軸：月〜日曜（7行）/ 横軸：朝・昼・夕・夜（4列）
-   ─ 全寸法を mm 単位でハードコード → ブラウザ差異ゼロ・均等行確実
-   ─ 1ページ固定：wrap を A4横可能域にピッタリ固定
-   ─ mode: 'print' → プリンタ向け / 'pdf' → PDF向け（背景色強制ON）
-
-   寸法設計（A4横 @page margin:8mm）
-   ─ 印刷可能域       : 281mm × 194mm
-   ─ ヘッダー(#hd)    :   8mm（height）+ 1.5mm（border+margin）= 9.5mm
-   ─ thead            :   7mm
-   ─ tbody 残高さ     : 194 - 9.5 - 7 = 177.5mm
-   ─ tbody 1行        : 177.5 / 7 = 25.357mm → 25mm（端数を余白に吸収）
-   ─ タグ表示域       : 25mm - 2mm(padding×2) - 0.5mm(border×2) = 22.5mm
+   印刷用 HTML 生成  — Android Chrome / iOS Safari / PC 共通対応版
+   ────────────────────────────────────────────────────────────────────
+   ■ スマホ印刷の制約（ブラウザ仕様）
+     - Android Chrome : @page size / transform は印刷時に無視される
+                        window.print() は動作するが用紙設定はダイアログで手動
+     - iOS Safari     : @page size 完全無視。window.print() → 共有シート → 印刷
+     - PC Chrome/Edge : @page size + transform:scale(0.8) が有効
+   ■ 対策
+     - 印刷HTMLページ上部に【設定ガイドバー】を表示
+       → 「横向き・サイズ80%」をユーザーへ明示案内
+     - @media print でガイドバーを非表示
+     - UA判定でAndroid/iOS別の操作手順をガイドに表示
+     - transform:scale(0.8) はPCでのみ有効、スマホは手動設定案内でカバー
+   ■ 寸法設計（A4横 margin:8mm）
+     PAGE: 281×194mm / HD: 9.5mm / TH: 7mm
+     ROW_H: (177.5-0.5)/7 = 25.2mm（安全余白込み）
 ══════════════════════════════════════════════════════════════════════ */
 function buildPrintHtml(mode) {
   var u = getUserInfo();
 
   /* ── 寸法定数（mm） ── */
-  var PAGE_W   = 281;    // A4横 印刷可能域 幅
-  var PAGE_H   = 194;    // A4横 印刷可能域 高さ
-  var HD_H     = 8;      // ヘッダー高さ
-  var HD_MB    = 1.5;    // ヘッダー border(0.4mm) + margin-bottom(1.1mm)
-  var TH_H     = 7;      // thead 高さ
-  var ROWS     = 7;      // 曜日行数
-  // 安全余白 0.5mm を確保してから 7 等分、小数第1位切り捨て
-  // → ROW_H=25.2mm × 7 = 176.4mm、合計 192.9mm（余白 1.1mm）
-  var ROW_H    = Math.floor((PAGE_H - HD_H - HD_MB - TH_H - 0.5) / ROWS * 10) / 10;
-  var TAG_H    = Math.round((ROW_H - 2.5) * 10) / 10; // タグ表示域（padding+border分を引く）
+  var PAGE_W = 281, PAGE_H = 194;
+  var HD_H = 8, HD_MB = 1.5, TH_H = 7, ROWS = 7;
+  var ROW_H = Math.floor((PAGE_H - HD_H - HD_MB - TH_H - 0.5) / ROWS * 10) / 10;
+  var TAG_H = Math.round((ROW_H - 2.5) * 10) / 10;
 
   /* ── 利用者情報ヘッダー HTML ── */
   var infoHtml = '';
   [['利用者', u.name ? u.name + ' 様' : ''], ['担当者', u.staff], ['期間', u.period]]
-    .forEach(function(pair) {
-      if (!pair[1]) return;
-      infoHtml += '<span class="fi"><span class="fl">' + escHtml(pair[0]) + '：</span>' + escHtml(pair[1]) + '</span>';
+    .forEach(function(p) {
+      if (!p[1]) return;
+      infoHtml += '<span class="fi"><span class="fl">' + escHtml(p[0]) + '：</span>' + escHtml(p[1]) + '</span>';
     });
 
   /* ── tbody 行 HTML ── */
@@ -1259,22 +1253,18 @@ function buildPrintHtml(mode) {
     var cells = '<td class="dc">' + dayLabel + '</td>';
     SLOTS.forEach(function(slot) {
       var tags = getTags(day, slot);
-      if (tags.length) {
-        cells += '<td><div class="tw">'
-          + tags.map(function(t) {
-              return '<span class="tc ' + slot + '">' + escHtml(t) + '</span>';
-            }).join('')
-          + '</div></td>';
-      } else {
-        cells += '<td><span class="te">─</span></td>';
-      }
+      cells += tags.length
+        ? '<td><div class="tw">' + tags.map(function(t) {
+            return '<span class="tc ' + slot + '">' + escHtml(t) + '</span>';
+          }).join('') + '</div></td>'
+        : '<td><span class="te">─</span></td>';
     });
     return '<tr>' + cells + '</tr>';
   }).join('');
 
   /* ── PDF モード：背景色強制 ON ── */
-  var pdfExtra = (mode === 'pdf')
-    ? '<style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style>'
+  var colorForce = (mode === 'pdf')
+    ? '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
     : '';
 
   return [
@@ -1285,180 +1275,228 @@ function buildPrintHtml(mode) {
     '<link rel="preconnect" href="https://fonts.googleapis.com">',
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
     '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">',
-    pdfExtra,
     '<style>',
 
-    /* ページ設定 */
+    /* リセット・背景色印刷 */
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+    colorForce,
+    'body{font-family:"Noto Sans JP",-apple-system,sans-serif;color:#1c1c1e;background:#fff}',
+
+    /* ── 設定ガイドバー（画面表示のみ・印刷時は非表示）── */
+    '#guide{',
+    ' background:#1c1c1e;color:#fff;',
+    ' padding:12px 16px;font-size:13px;line-height:1.7;',
+    '}',
+    '#guide h2{font-size:15px;font-weight:700;margin-bottom:6px;color:#ffd60a}',
+    '#guide .step{display:flex;gap:8px;align-items:flex-start;margin-bottom:4px}',
+    '#guide .num{',
+    ' background:#ffd60a;color:#1c1c1e;border-radius:50%;',
+    ' width:20px;height:20px;min-width:20px;',
+    ' display:flex;align-items:center;justify-content:center;',
+    ' font-weight:700;font-size:12px;',
+    '}',
+    '#guide .android{display:none}',
+    '#guide .ios{display:none}',
+    '#guide .pc{display:none}',
+    '#guide-close{',
+    ' display:block;width:100%;margin-top:10px;padding:10px;',
+    ' background:#ffd60a;color:#1c1c1e;border:none;border-radius:8px;',
+    ' font-size:14px;font-weight:700;cursor:pointer;',
+    '}',
+
+    /* ── 印刷レイアウト ── */
     '@page{size:A4 landscape;margin:8mm}',
-    '*{box-sizing:border-box;margin:0;padding:0;',
-    ' -webkit-print-color-adjust:exact;print-color-adjust:exact}',
 
-    /* html / body：印刷可能域ぴったりに固定 */
-    'html{width:' + PAGE_W + 'mm;height:' + PAGE_H + 'mm;overflow:hidden}',
-    'body{',
-    ' width:' + PAGE_W + 'mm;height:' + PAGE_H + 'mm;',
-    ' margin:0;padding:0;overflow:hidden;',
-    ' font-family:"Noto Sans JP",-apple-system,sans-serif;',
-    ' color:#1c1c1e;background:#fff;',
+    '#wrap{',
+    ' width:' + PAGE_W + 'mm;',
+    ' height:' + PAGE_H + 'mm;',
+    ' overflow:hidden;',
+    /* PCではscale(0.8)で1ページ確実収縮 */
+    ' transform:scale(0.8);',
+    ' transform-origin:top left;',
     '}',
 
-    /* 利用者情報ヘッダー：高さ固定 */
-    '#hd{',
-    ' height:' + HD_H + 'mm;',
-    ' display:flex;align-items:center;gap:4mm;',
-    ' border-bottom:.4mm solid #3a3a3c;',
-    ' margin-bottom:' + HD_MB + 'mm;',
-    ' font-size:7.5pt;overflow:hidden;flex-shrink:0;',
-    '}',
+    '#hd{height:' + HD_H + 'mm;display:flex;align-items:center;gap:4mm;',
+    '    border-bottom:.4mm solid #3a3a3c;margin-bottom:' + HD_MB + 'mm;',
+    '    font-size:7.5pt;overflow:hidden;flex-shrink:0}',
     '.ht{font-size:10pt;font-weight:700;letter-spacing:.06em;white-space:nowrap;margin-right:2mm}',
     '.fl{font-weight:700;margin-right:.5mm}',
     '.fi{color:#3a3a3c;white-space:nowrap;margin-right:3mm}',
 
-    /* テーブル本体：幅100%・高さ残余すべて */
-    'table{',
-    ' width:' + PAGE_W + 'mm;',
-    ' border-collapse:collapse;table-layout:fixed;',
-    '}',
+    'table{width:' + PAGE_W + 'mm;border-collapse:collapse;table-layout:fixed}',
     'col.cd{width:10%}col.cs{width:22.5%}',
-
-    /* thead：高さ固定 */
     'thead tr{height:' + TH_H + 'mm}',
-    'th{',
-    ' border:.25mm solid #9a9a9a;',
-    ' font-weight:700;font-size:8pt;',
-    ' text-align:center;padding:1mm;',
-    ' white-space:nowrap;background:#f0f0f5;',
-    ' vertical-align:middle;overflow:hidden;',
-    '}',
+    'th{border:.25mm solid #9a9a9a;font-weight:700;font-size:8pt;',
+    '  text-align:center;padding:1mm;white-space:nowrap;',
+    '  background:#f0f0f5;vertical-align:middle;overflow:hidden}',
     'thead th:first-child{background:#3a3a3c;color:#fff}',
     '.hm{color:#856404}.hn{color:#0f5132}.he{color:#084298}.hni{color:#432874}',
 
-    /* tbody 各行：高さをmmで完全固定 → 7行均等・ズレなし */
-    'tbody tr{',
-    ' height:' + ROW_H + 'mm;',
-    ' max-height:' + ROW_H + 'mm;',
-    '}',
-    'td{',
-    ' border:.25mm solid #9a9a9a;',
-    ' padding:1.2mm 1.5mm;',
-    ' vertical-align:top;overflow:hidden;',
-    ' font-size:7pt;line-height:1.35;',
-    ' height:' + ROW_H + 'mm;',       /* td にも同じ高さを明示 */
-    ' max-height:' + ROW_H + 'mm;',
-    '}',
+    'tbody tr{height:' + ROW_H + 'mm;max-height:' + ROW_H + 'mm}',
+    'td{border:.25mm solid #9a9a9a;padding:1.2mm 1.5mm;',
+    '  vertical-align:top;overflow:hidden;',
+    '  font-size:7pt;line-height:1.35;',
+    '  height:' + ROW_H + 'mm;max-height:' + ROW_H + 'mm}',
+    'td.dc{font-weight:700;font-size:8.5pt;text-align:center;vertical-align:middle;background:#f0f0f5;white-space:pre}',
 
-    /* 曜日ラベルセル */
-    'td.dc{',
-    ' font-weight:700;font-size:8.5pt;',
-    ' text-align:center;vertical-align:middle;',
-    ' background:#f0f0f5;white-space:pre;',
-    '}',
-
-    /* タグ表示コンテナ：高さをセル内に収める */
-    '.tw{',
-    ' display:flex;flex-wrap:wrap;',
-    ' gap:.6mm;align-content:flex-start;',
-    ' overflow:hidden;',
-    ' max-height:' + TAG_H + 'mm;',
-    '}',
-
-    /* タグチップ */
-    '.tc{',
-    ' display:inline-block;font-size:6.5pt;font-weight:500;',
-    ' padding:.35mm 1.8mm;border-radius:2px;',
-    ' white-space:nowrap;line-height:1.45;',
-    '}',
+    '.tw{display:flex;flex-wrap:wrap;gap:.6mm;align-content:flex-start;overflow:hidden;max-height:' + TAG_H + 'mm}',
+    '.tc{display:inline-block;font-size:6.5pt;font-weight:500;padding:.35mm 1.8mm;border-radius:2px;white-space:nowrap;line-height:1.45}',
     '.tc.morning{background:#fff3cd;color:#856404}',
-    '.tc.noon   {background:#d1e7dd;color:#0f5132}',
+    '.tc.noon{background:#d1e7dd;color:#0f5132}',
     '.tc.evening{background:#cfe2ff;color:#084298}',
-    '.tc.night  {background:#e2d9f3;color:#432874}',
+    '.tc.night{background:#e2d9f3;color:#432874}',
     '.te{color:#aaa;font-size:7pt}',
 
-    /* 印刷時：ページ分割を厳禁 */
+    /* 印刷時：ガイドバー非表示・レイアウト維持 */
     '@media print{',
-    ' html,body{width:' + PAGE_W + 'mm!important;height:' + PAGE_H + 'mm!important;overflow:hidden!important}',
+    ' #guide{display:none!important}',
+    ' body{margin:0;padding:0}',
+    ' #wrap{transform:scale(0.8)!important;transform-origin:top left!important;',
+    '       width:' + PAGE_W + 'mm!important;height:' + PAGE_H + 'mm!important;overflow:hidden!important}',
     ' table{page-break-inside:avoid;break-inside:avoid}',
     ' tbody tr{page-break-inside:avoid;break-inside:avoid;',
     '          height:' + ROW_H + 'mm!important;max-height:' + ROW_H + 'mm!important}',
     ' td{height:' + ROW_H + 'mm!important;max-height:' + ROW_H + 'mm!important}',
     '}',
     '</style>',
+
+    /* UA判定＋ガイド表示＋自動印刷スクリプト */
+    '<script>',
+    '(function(){',
+    '  var ua=navigator.userAgent;',
+    '  var isAndroid=/Android/i.test(ua);',
+    '  var isIOS=/iPhone|iPad|iPod/i.test(ua);',
+    '  var isPC=!isAndroid&&!isIOS;',
+
+    /* ガイドバーのOS別テキストを表示 */
+    '  function showGuide(){',
+    '    var g=document.getElementById("guide");',
+    '    if(!g)return;',
+    '    if(isAndroid){',
+    '      g.querySelector(".android").style.display="block";',
+    '    }else if(isIOS){',
+    '      g.querySelector(".ios").style.display="block";',
+    '    }else{',
+    '      g.querySelector(".pc").style.display="block";',
+    '    }',
+    '  }',
+
+    /* 閉じるボタン */
+    '  window.closeGuide=function(){',
+    '    var g=document.getElementById("guide");',
+    '    if(g)g.style.display="none";',
+    '  };',
+
+    /* 自動印刷：PCのみ自動実行。スマホはガイドを見てから手動 */
+    '  function autoPrint(){',
+    '    if(isPC){',
+    '      document.fonts.ready.then(function(){',
+    '        setTimeout(function(){window.print();},400);',
+    '      });',
+    '    }',
+    '    /* スマホ：ガイドバーを表示してユーザーに操作してもらう */',
+    '  }',
+
+    '  document.addEventListener("DOMContentLoaded",function(){',
+    '    showGuide();',
+    '    autoPrint();',
+    '  });',
+    '})();',
+    '<\/script>',
+
     '</head>',
     '<body>',
 
-    /* 利用者情報ヘッダー */
-    '<div id="hd">',
-    '  <span class="ht">週間スケジュール表</span>',
-    infoHtml,
+    /* ── 設定ガイドバー ── */
+    '<div id="guide">',
+    '  <h2>📋 印刷の前に設定してください</h2>',
+
+    /* Android 用ガイド */
+    '  <div class="android">',
+    '    <div class="step"><span class="num">1</span><span>画面右上の <b>⋮（メニュー）</b> → <b>印刷</b> をタップ</span></div>',
+    '    <div class="step"><span class="num">2</span><span>印刷設定で <b>用紙の向き：横</b> を選択</span></div>',
+    '    <div class="step"><span class="num">3</span><span><b>ページに合わせる</b> または <b>縮小率80%</b> に設定</span></div>',
+    '    <div class="step"><span class="num">4</span><span>プリンターを選んで印刷ボタンをタップ</span></div>',
+    '  </div>',
+
+    /* iOS 用ガイド */
+    '  <div class="ios">',
+    '    <div class="step"><span class="num">1</span><span>画面下部の <b>共有ボタン（□↑）</b> をタップ</span></div>',
+    '    <div class="step"><span class="num">2</span><span><b>プリント</b> を選択</span></div>',
+    '    <div class="step"><span class="num">3</span><span>プリンタプレビューで <b>用紙の向き：横向き</b> を設定</span></div>',
+    '    <div class="step"><span class="num">4</span><span><b>倍率</b> を <b>80%</b> に設定してプリントをタップ</span></div>',
+    '  </div>',
+
+    /* PC 用ガイド */
+    '  <div class="pc">',
+    '    <div class="step"><span class="num">1</span><span>印刷ダイアログが自動で開きます</span></div>',
+    '    <div class="step"><span class="num">2</span><span><b>用紙の向き：横</b> を確認</span></div>',
+    '    <div class="step"><span class="num">3</span><span><b>縮小率80%</b> またはページに合わせるに設定</span></div>',
+    '  </div>',
+
+    '  <button id="guide-close" onclick="closeGuide()">✕ ガイドを閉じる（印刷後に不要な場合）</button>',
     '</div>',
 
-    /* スケジュールテーブル */
+    /* ── スケジュール表本体 ── */
+    '<div id="wrap">',
+    '<div id="hd"><span class="ht">週間スケジュール表</span>', infoHtml, '</div>',
     '<table>',
-    '<colgroup>',
-    '  <col class="cd">',
-    '  <col class="cs"><col class="cs"><col class="cs"><col class="cs">',
-    '</colgroup>',
+    '<colgroup><col class="cd"><col class="cs"><col class="cs"><col class="cs"><col class="cs"></colgroup>',
     '<thead><tr>',
-    '  <th>曜日</th>',
-    '  <th class="hm">🌅 朝</th>',
-    '  <th class="hn">☀️ 昼</th>',
-    '  <th class="he">🌇 夕</th>',
-    '  <th class="hni">🌙 夜</th>',
+    '<th>曜日</th>',
+    '<th class="hm">🌅 朝</th>',
+    '<th class="hn">☀️ 昼</th>',
+    '<th class="he">🌇 夕</th>',
+    '<th class="hni">🌙 夜</th>',
     '</tr></thead>',
     '<tbody>', rowsHtml, '</tbody>',
     '</table>',
+    '</div>',
 
     '</body></html>',
   ].join('');
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   iframe 経由で印刷ダイアログを開くユーティリティ
-   mode: 'print' → プリンタ印刷 / 'pdf' → PDF向け（背景色ON指示）
+   印刷・PDF 共通ユーティリティ
+   ─ window.open() をユーザージェスチャー直後（同期）で呼ぶ
+     iOS Safari はここで遅延があるとポップアップブロックになる
+   ─ PCは自動印刷ダイアログ、スマホはガイドバー表示で手動操作
 ══════════════════════════════════════════════════════════════════════ */
-function _openPrintIframe(mode) {
+function _openPrint(mode) {
+  /* ① 必ずジェスチャー直後・同期で window.open() */
+  var win = window.open('', '_blank');
+
   closePreview();
 
-  var old = document.getElementById('_print_iframe');
-  if (old) old.parentNode.removeChild(old);
-
-  var iframe = document.createElement('iframe');
-  iframe.id = '_print_iframe';
-  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;border:none;opacity:0;pointer-events:none;';
-  document.body.appendChild(iframe);
-
   var html = buildPrintHtml(mode);
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
 
-  iframe.contentDocument.fonts.ready.then(function() {
-    // フォント＋レイアウト確定を少し待ってから印刷
-    setTimeout(function() {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    }, 300);
-    setTimeout(function() {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    }, 120000);
-  });
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } else {
+    /* ポップアップブロック時フォールバック：Blob URL */
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 60000);
+    showToast('新しいタブで印刷画面を開いてください');
+  }
 }
 
-/* ══ 🖨️ 印刷する（プリンタ向け）
-   背景色の印刷はユーザーがブラウザ設定で制御できる通常モード。
-══════════════════════════════════════════════════════════════════════ */
+/* ══ 🖨️ 印刷する ══ */
 function printSchedule() {
-  showToast('🖨️ 印刷ダイアログを開いています…');
-  _openPrintIframe('print');
+  _openPrint('print');
 }
 
-/* ══ 📥 PDF 保存（PDF 向け専用）
-   背景色・タグ色を強制 ON にした HTML を生成し、
-   「PDFとして保存」を選ぶよう案内するトースト表示。
-══════════════════════════════════════════════════════════════════════ */
+/* ══ 📥 PDF 保存 ══ */
 function savePdfDirect() {
-  showToast('📥 印刷ダイアログ →「PDFとして保存」を選択してください');
-  _openPrintIframe('pdf');
+  _openPrint('pdf');
 }
 
 function escHtml(str) {
